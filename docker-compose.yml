@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sen2nal-postgres
+    environment:
+      POSTGRES_DB: sen2nal
+      POSTGRES_USER: sen2nal_user
+      POSTGRES_PASSWORD: sen2nal_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sen2nal_user -d sen2nal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sen2nal-network
+
+  # pgAdmin (optional - for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sen2nal-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sen2nal.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - sen2nal-network
+    profiles:
+      - dev-tools  # Only start with: docker-compose --profile dev-tools up
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  sen2nal-network:
+    driver: bridge

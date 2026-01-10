@@ -1,0 +1,28 @@
+Generic single-database configuration for Alembic migrations.
+
+## Commands
+
+Create a new migration (auto-generate from models):
+```bash
+alembic revision --autogenerate -m "description of changes"
+```
+
+Run all pending migrations:
+```bash
+alembic upgrade head
+```
+
+Rollback last migration:
+```bash
+alembic downgrade -1
+```
+
+Show migration history:
+```bash
+alembic history
+```
+
+Show current revision:
+```bash
+alembic current
+```

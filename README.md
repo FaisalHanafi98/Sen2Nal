@@ -2,6 +2,7 @@
 
 **Stock Sentiment + Calendar Signal Analysis System**
 
+[![CI](https://github.com/FaisalHanafi98/Sen2Nal/actions/workflows/ci.yml/badge.svg)](https://github.com/FaisalHanafi98/Sen2Nal/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-red.svg)](https://streamlit.io)

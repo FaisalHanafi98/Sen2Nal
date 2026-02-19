@@ -28,7 +28,7 @@ env/
 .venv
 
 # Poetry
-poetry.lock
+# poetry.lock is committed for reproducible builds (Docker, CI)
 
 # Environment Variables
 .env
@@ -93,6 +93,7 @@ models/*.pth
 
 # OS
 Thumbs.db
+NUL
 
 # Temporary files
 tmp/

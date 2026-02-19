@@ -1,0 +1,71 @@
+name: Sen2Nal CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: sen2nal_test
+          POSTGRES_USER: sen2nal_user
+          POSTGRES_PASSWORD: sen2nal_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sen2nal_user -d sen2nal_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@localhost:5432/sen2nal_test
+      ENVIRONMENT: testing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+          restore-keys: venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --without dev || poetry install --no-interaction
+
+      - name: Run ruff linter
+        run: poetry run ruff check .
+
+      - name: Run mypy type checker
+        run: poetry run mypy src/ --ignore-missing-imports
+
+      - name: Run pytest with coverage
+        run: poetry run pytest --cov=src --cov-report=xml --cov-report=term -v
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml

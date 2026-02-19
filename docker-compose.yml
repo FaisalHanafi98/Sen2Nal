@@ -9,7 +9,6 @@ services:
       POSTGRES_DB: sen2nal
       POSTGRES_USER: sen2nal_user
       POSTGRES_PASSWORD: sen2nal_password
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     ports:
       - "5432:5432"
     volumes:
@@ -20,6 +19,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - sen2nal-network
+
+  # FastAPI Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sen2nal-app
+    environment:
+      DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@postgres:5432/sen2nal
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sen2nal-network
+
+  # Streamlit Dashboard
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: sen2nal-dashboard
+    environment:
+      DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@postgres:5432/sen2nal
+      API_URL: http://app:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - app
     networks:
       - sen2nal-network
 

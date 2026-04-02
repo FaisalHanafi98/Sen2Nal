@@ -1,3 +1,7 @@
+> **GOVERNANCE NOTICE**: This project-level CLAUDE.md operates under the authority of the root CLAUDE.md. In case of conflict, root CLAUDE.md (Section 0.2 Override Hierarchy) prevails. This file may define project-specific constraints but may not override root governance.
+
+---
+
 # Sen2Nal - Stock Sentiment + Calendar Signal Analysis
 
 ## Project Overview
@@ -124,6 +128,40 @@ See `.env.example` for required configuration:
 - Code formatted (black)
 - Coverage >= 80% for scoring modules
 
+## Current Status (Phase 5.5.1 Complete)
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Python Environment** | ✅ Ready | Python 3.14.2, Poetry installed, 100+ packages |
+| **PostgreSQL Database** | ✅ Running | Docker container `sen2nal-postgres` healthy |
+| **Database Schema** | ✅ Applied | 10 tables (3 dim, 4 fact, 2 staging, 1 tracking) |
+| **Indexes** | ✅ Created | 16 indexes including 5 composite |
+| **Foreign Keys** | ✅ Created | 3 FK constraints with CASCADE delete |
+| **Alembic Migrations** | ✅ Initialized | Revision '001' recorded |
+| **UUID Extension** | ✅ Enabled | uuid-ossp active |
+
+### Quick Start Commands
+```bash
+# Activate environment (if not active)
+cd Sen2Nal
+poetry shell
+
+# Start database (if stopped)
+docker-compose up -d postgres
+
+# Verify database connection
+docker-compose exec postgres psql -U sen2nal_user -d sen2nal -c "\dt"
+
+# Run verification script
+poetry run python scripts/check_setup.py
+```
+
+### Next Phase: 5.5.2 (Initial Data Pipeline Test)
+1. Fetch sample stock data from Alpha Vantage
+2. Run FinBERT sentiment analysis
+3. Store results in PostgreSQL
+4. Visualize in Streamlit dashboard
+
 ## Agent Architecture
 
 Sen2Nal uses a **7-Agent System** for modular development:
@@ -140,16 +178,7 @@ Sen2Nal uses a **7-Agent System** for modular development:
 
 **Pipeline Flow**: Ingestion → Sentiment → Calendar → Features → Prediction → Database → Dashboard
 
-## MCP Priority
-
-Follow MCP-First approach per Root CLAUDE.md:
-1. **Git MCP** for all version control
-2. **GitHub MCP** for remote operations
-3. **Context7 MCP** for documentation lookup
-4. **PostgreSQL MCP** for database queries (if installed)
-5. **Jupyter MCP** for ML experiments (if installed)
-
-See [SEN2NAL_MCP_INTEGRATION.md](SEN2NAL_MCP_INTEGRATION.md) for detailed patterns.
+> Token optimization and CLI-first rules: See root [CLAUDE.md](../CLAUDE.md) v2.0.0 (Section 6).
 
 ## Documentation References
 
@@ -169,5 +198,7 @@ See [SEN2NAL_MCP_INTEGRATION.md](SEN2NAL_MCP_INTEGRATION.md) for detailed patter
 - [SEN2NAL_RESEARCH_KNOWLEDGE_BASE.md](SEN2NAL_RESEARCH_KNOWLEDGE_BASE.md) - 47 sources synthesis
 
 ---
-*Last Updated: 2026-01-12*
+*Last Updated: 2026-01-16*
+*Phase: 5.5.1 Complete - Environment Ready*
 *Agent Architecture: 7-Agent System v1.0*
+*Token Optimization: See Root CLAUDE.md v2.0.0*

@@ -40,9 +40,21 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("⚠ Database connection failed - check your configuration")
 
+    # Start pipeline scheduler if enabled
+    scheduler = None
+    if settings.enable_scheduler:
+        from src.pipeline.scheduler import start_scheduler
+
+        scheduler = start_scheduler()
+        logger.info("✓ Pipeline scheduler started")
+
     yield
 
     # Shutdown
+    if scheduler:
+        from src.pipeline.scheduler import stop_scheduler
+
+        stop_scheduler()
     logger.info("Shutting down Sen2Nal API Server...")
 
 
@@ -146,16 +158,18 @@ async def internal_error_handler(request, exc):
 
 
 # =============================================================================
-# Import routers (will add in later phases)
+# Routers
 # =============================================================================
 
-# from src.api.routers import health, stocks, sectors, market, experiment
-#
-# app.include_router(health.router, prefix=f"/api/{API_VERSION}", tags=["Health"])
-# app.include_router(stocks.router, prefix=f"/api/{API_VERSION}", tags=["Stocks"])
-# app.include_router(sectors.router, prefix=f"/api/{API_VERSION}", tags=["Sectors"])
-# app.include_router(market.router, prefix=f"/api/{API_VERSION}", tags=["Market"])
-# app.include_router(experiment.router, prefix=f"/api/{API_VERSION}", tags=["Experiment"])
+from src.api.routers.stocks import router as stocks_router
+from src.api.routers.experiments import router as experiments_router
+from src.api.routers.pipeline import router as pipeline_router
+from src.api.routers.alerts import router as alerts_router
+
+app.include_router(stocks_router)
+app.include_router(experiments_router)
+app.include_router(pipeline_router)
+app.include_router(alerts_router)
 
 
 if __name__ == "__main__":

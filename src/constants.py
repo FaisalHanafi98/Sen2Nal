@@ -87,6 +87,20 @@ TOP_10_TICKERS = [
     "V",  # Visa Inc.
 ]
 
+ALLOWED_TICKERS = frozenset(TOP_10_TICKERS)
+
+
+def validate_tickers(tickers: list[str]) -> list[str]:
+    """Filter tickers to only those in the whitelist. Logs rejected ones."""
+    valid = [t for t in tickers if t in ALLOWED_TICKERS]
+    rejected = set(tickers) - ALLOWED_TICKERS
+    if rejected:
+        import logging
+        logging.getLogger("sen2nal.tickers").warning(
+            f"Rejected non-whitelisted tickers: {rejected}"
+        )
+    return valid
+
 
 # -----------------------------------------------------------------------------
 # Data Sources
@@ -208,6 +222,7 @@ MAX_HISTORY_DAYS = 540  # 18 months
 
 EXPERIMENT_TOTAL_WEEKS = 8
 EXPERIMENT_STOCKS_PER_METHOD = 3
+EXPERIMENT_METHODS = ["SEN2NAL", "CHATGPT", "GEMINI", "GROK"]
 
 # LLM Prompt Template
 LLM_EXPERIMENT_PROMPT = """You are a financial analyst. Based on current market conditions as of {date},

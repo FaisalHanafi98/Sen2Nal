@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sen2nal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sen2nal
+      POSTGRES_USER: ${DB_USER:-sen2nal_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sen2nal_user} -d sen2nal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sen2nal-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sen2nal-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-sen2nal_user}:${DB_PASSWORD}@postgres:5432/sen2nal
+      ENVIRONMENT: production
+      NEWSAPI_API_KEY: ${NEWSAPI_API_KEY:-}
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      ENABLE_SCHEDULER: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sen2nal-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_USE_MOCK_DATA: "false"
+    container_name: sen2nal-frontend
+    restart: unless-stopped
+    depends_on:
+      - app
+    networks:
+      - sen2nal-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: sen2nal-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_data:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - app
+      - frontend
+    networks:
+      - sen2nal-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: sen2nal-certbot
+    volumes:
+      - certbot_data:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  postgres_data:
+    driver: local
+  certbot_data:
+    driver: local
+  certbot_www:
+    driver: local
+
+networks:
+  sen2nal-network:
+    driver: bridge

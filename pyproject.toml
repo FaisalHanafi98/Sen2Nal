@@ -15,10 +15,6 @@ uvicorn = {extras = ["standard"], version = "^0.27.0"}
 pydantic = "^2.5.0"
 pydantic-settings = "^2.1.0"
 
-# Dashboard
-streamlit = "^1.30.0"
-plotly = "^5.18.0"
-
 # Database
 sqlalchemy = "^2.0.25"
 psycopg2-binary = "^2.9.9"
@@ -29,11 +25,11 @@ transformers = "^4.36.0"
 torch = "^2.1.0"
 xgboost = "^2.0.3"
 scikit-learn = "^1.4.0"
-shap = "^0.44.0"
+# shap = "^0.44.0"  # Moved to optional - requires MSVC build tools
 
 # Data Processing
-pandas = "^2.1.4"
-numpy = "^1.26.3"
+pandas = "^2.2.0"
+numpy = "^2.1.0"
 nltk = "^3.8.1"
 spacy = "^3.7.2"
 
@@ -42,8 +38,8 @@ requests = "^2.31.0"
 aiohttp = "^3.9.1"
 praw = "^7.7.1"
 yfinance = "^0.2.35"
-beautifulsoup4 = "^4.12.3"
-lxml = "^5.1.0"
+# beautifulsoup4 = "^4.12.3"  # Requires lxml which needs MSVC
+# lxml = "^5.1.0"  # Requires MSVC build tools
 
 # AWS
 boto3 = "^1.34.25"
@@ -92,7 +88,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers"
+addopts = "-v --tb=short --strict-markers --cov-fail-under=40"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "browser: marks tests that require browser automation",

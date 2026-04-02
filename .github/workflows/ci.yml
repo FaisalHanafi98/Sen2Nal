@@ -27,6 +27,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@localhost:5432/sen2nal_test
       ENVIRONMENT: testing
+      PYTHONDONTWRITEBYTECODE: 1
 
     steps:
       - name: Checkout code
@@ -51,8 +52,8 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
           restore-keys: venv-${{ runner.os }}-
 
-      - name: Install dependencies
-        run: poetry install --no-interaction --without dev || poetry install --no-interaction
+      - name: Install dependencies (including dev/test)
+        run: poetry install --no-interaction
 
       - name: Run ruff linter
         run: poetry run ruff check .
@@ -61,7 +62,7 @@ jobs:
         run: poetry run mypy src/ --ignore-missing-imports
 
       - name: Run pytest with coverage
-        run: poetry run pytest --cov=src --cov-report=xml --cov-report=term -v
+        run: poetry run pytest --cov=src --cov-report=xml --cov-report=term --cov-fail-under=40 -v
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

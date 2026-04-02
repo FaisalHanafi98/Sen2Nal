@@ -88,8 +88,9 @@ models/*.pkl
 models/*.pt
 models/*.pth
 
-# Streamlit
-.streamlit/secrets.toml
+# Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
 
 # OS
 Thumbs.db

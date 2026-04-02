@@ -64,7 +64,7 @@ class PredictionAgent(BaseAgent):
             y = y[-TRAIN_WINDOW:]
             self.logger.info(f"Walk-forward: using last {TRAIN_WINDOW} of {len(meta)} samples")
 
-        model = self._train_model(X, y)
+        model = self._load_or_train(X, y, force_retrain=kwargs.get("force_retrain", False))
 
         # Generate predictions for target date
         predictions = self._predict(model, target, ticker_list)
@@ -124,6 +124,18 @@ class PredictionAgent(BaseAgent):
             meta_list.append({"stock_id": sent.stock_id, "date_id": sent.date_id})
 
         return np.array(X_list), np.array(y_list), meta_list
+
+    def _load_or_train(self, X: np.ndarray, y: np.ndarray, force_retrain: bool = False) -> Any:
+        """Load saved model if available and recent, otherwise train fresh."""
+        if not force_retrain and MODEL_PATH.exists():
+            try:
+                import joblib
+                model = joblib.load(MODEL_PATH)
+                self.logger.info(f"Loaded existing model from {MODEL_PATH}")
+                return model
+            except Exception as e:
+                self.logger.warning(f"Failed to load saved model: {e}. Retraining.")
+        return self._train_model(X, y)
 
     def _train_model(self, X: np.ndarray, y: np.ndarray) -> Any:
         """Train XGBoost classifier with walk-forward principles."""

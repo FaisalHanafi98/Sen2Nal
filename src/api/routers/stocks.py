@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.orm import Session
 
-from src.constants import API_PREFIX, FOOTER_DISCLAIMER
+from src.constants import ALLOWED_TICKERS, API_PREFIX, FOOTER_DISCLAIMER
 from src.database.connection import get_db
 from src.database.models import (
     DimCalendar,
@@ -83,8 +83,12 @@ def get_sentiment_history(
     db: Session = Depends(get_db),
 ):
     """Get sentiment time series for a ticker — powers the timeline chart."""
+    ticker = ticker.upper()
+    if ticker not in ALLOWED_TICKERS:
+        return {"history": [], "error": f"Ticker {ticker} not in allowed list"}
+
     stock_id = db.execute(
-        select(DimStock.stock_id).where(DimStock.ticker == ticker.upper())
+        select(DimStock.stock_id).where(DimStock.ticker == ticker)
     ).scalar()
     if not stock_id:
         return {"history": [], "error": f"Ticker {ticker} not found"}

@@ -117,12 +117,7 @@ def get_pipeline_logs(limit: int = 50, db: Session = Depends(get_db)):
     ).scalars().all()
 
     if not logs:
-        return {"logs": [{
-            "timestamp": datetime.utcnow().isoformat(),
-            "stage": "System",
-            "message": "No pipeline runs recorded yet. Trigger via POST /pipeline/run",
-            "level": "info",
-        }]}
+        return {"logs": []}
 
     return {"logs": [
         {

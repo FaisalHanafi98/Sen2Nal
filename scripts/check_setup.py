@@ -12,23 +12,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def check_python_version():
     """Check Python version is 3.11+"""
-    print("🐍 Checking Python version...")
+    print("[*] Checking Python version...")
     version = sys.version_info
     if version.major >= 3 and version.minor >= 11:
-        print(f"   ✅ Python {version.major}.{version.minor}.{version.micro}")
+        print(f"   [OK] Python {version.major}.{version.minor}.{version.micro}")
         return True
     else:
-        print(f"   ❌ Python {version.major}.{version.minor}.{version.micro} (need 3.11+)")
+        print(f"   [FAIL] Python {version.major}.{version.minor}.{version.micro} (need 3.11+)")
         return False
 
 
 def check_dependencies():
     """Check required packages are installed."""
-    print("\n📦 Checking dependencies...")
+    print("\n[*] Checking dependencies...")
 
     required_packages = [
         ("fastapi", "FastAPI"),
-        ("streamlit", "Streamlit"),
         ("sqlalchemy", "SQLAlchemy"),
         ("alembic", "Alembic"),
         ("transformers", "Transformers"),
@@ -39,9 +38,9 @@ def check_dependencies():
     for package, name in required_packages:
         try:
             __import__(package)
-            print(f"   ✅ {name}")
+            print(f"   [OK] {name}")
         except ImportError:
-            print(f"   ❌ {name} (not installed)")
+            print(f"   [FAIL] {name} (not installed)")
             all_ok = False
 
     return all_ok
@@ -49,39 +48,39 @@ def check_dependencies():
 
 def check_database():
     """Check database connection."""
-    print("\n🗄️  Checking database connection...")
+    print("\n[*] Checking database connection...")
     try:
         from src.database.connection import check_db_connection
 
         if check_db_connection():
-            print("   ✅ PostgreSQL connection successful")
+            print("   [OK] PostgreSQL connection successful")
             return True
         else:
-            print("   ❌ PostgreSQL connection failed")
-            print("   💡 Run: docker-compose up -d postgres")
+            print("   [FAIL] PostgreSQL connection failed")
+            print("   [*] Tip: Run: docker-compose up -d postgres")
             return False
     except Exception as e:
-        print(f"   ❌ Error: {e}")
+        print(f"   [FAIL] Error: {e}")
         return False
 
 
 def check_environment_file():
     """Check .env file exists."""
-    print("\n⚙️  Checking environment configuration...")
+    print("\n[*] Checking environment configuration...")
     env_file = Path(__file__).parent.parent / ".env"
 
     if env_file.exists():
-        print("   ✅ .env file exists")
+        print("   [OK] .env file exists")
         return True
     else:
-        print("   ⚠️  .env file not found")
-        print("   💡 Run: cp .env.example .env")
+        print("   [!] .env file not found")
+        print("   [*] Tip: Run: cp .env.example .env")
         return True  # Not critical for Phase 0
 
 
 def check_migrations():
     """Check migrations status."""
-    print("\n🔄 Checking database migrations...")
+    print("\n[*] Checking database migrations...")
     try:
         import subprocess
         result = subprocess.run(
@@ -92,20 +91,20 @@ def check_migrations():
         )
 
         if "head" in result.stdout or result.returncode == 0:
-            print("   ✅ Migrations are up to date")
+            print("   [OK] Migrations are up to date")
             return True
         else:
-            print("   ⚠️  Migrations may not be applied")
-            print("   💡 Run: alembic upgrade head")
+            print("   [!] Migrations may not be applied")
+            print("   [*] Tip: Run: alembic upgrade head")
             return False
     except Exception as e:
-        print(f"   ⚠️  Could not check migrations: {e}")
+        print(f"   [!] Could not check migrations: {e}")
         return False
 
 
 def check_docker():
     """Check Docker is running."""
-    print("\n🐳 Checking Docker...")
+    print("\n[*] Checking Docker...")
     try:
         import subprocess
         result = subprocess.run(
@@ -115,29 +114,29 @@ def check_docker():
         )
 
         if result.returncode == 0:
-            print("   ✅ Docker is running")
+            print("   [OK] Docker is running")
 
             # Check if postgres container is running
             if "sen2nal-postgres" in result.stdout:
-                print("   ✅ PostgreSQL container is running")
+                print("   [OK] PostgreSQL container is running")
             else:
-                print("   ⚠️  PostgreSQL container not running")
-                print("   💡 Run: docker-compose up -d postgres")
+                print("   [!] PostgreSQL container not running")
+                print("   [*] Tip: Run: docker-compose up -d postgres")
             return True
         else:
-            print("   ❌ Docker is not running")
-            print("   💡 Start Docker Desktop")
+            print("   [FAIL] Docker is not running")
+            print("   [*] Tip: Start Docker Desktop")
             return False
     except FileNotFoundError:
-        print("   ❌ Docker not found")
-        print("   💡 Install Docker: https://docs.docker.com/get-docker/")
+        print("   [FAIL] Docker not found")
+        print("   [*] Tip: Install Docker: https://docs.docker.com/get-docker/")
         return False
 
 
 def main():
     """Run all checks."""
     print("=" * 80)
-    print("🔍 Sen2Nal Development Environment Check")
+    print("[*] Sen2Nal Development Environment Check")
     print("=" * 80)
 
     checks = [
@@ -151,13 +150,12 @@ def main():
 
     print("\n" + "=" * 80)
     if all(checks):
-        print("✅ All checks passed! You're ready to develop.")
+        print("[OK] All checks passed! You're ready to develop.")
         print("\nNext steps:")
         print("  1. Start API:       make run-api")
-        print("  2. Start Dashboard: make run-dashboard")
-        print("  3. Visit: http://localhost:8501")
+        print("  2. Visit: http://localhost:8000/api/v1/docs")
     else:
-        print("⚠️  Some checks failed. Please review above.")
+        print("[!] Some checks failed. Please review above.")
         print("\nQuick fixes:")
         print("  • Docker:     Start Docker Desktop")
         print("  • Database:   docker-compose up -d postgres")

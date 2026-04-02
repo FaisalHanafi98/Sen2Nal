@@ -39,17 +39,14 @@ services:
     networks:
       - sen2nal-network
 
-  # Streamlit Dashboard
-  dashboard:
+  # React Frontend (NightOps Terminal)
+  frontend:
     build:
       context: .
-      dockerfile: Dockerfile.streamlit
-    container_name: sen2nal-dashboard
-    environment:
-      DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@postgres:5432/sen2nal
-      API_URL: http://app:8000
+      dockerfile: Dockerfile.frontend
+    container_name: sen2nal-frontend
     ports:
-      - "8501:8501"
+      - "3000:3000"
     depends_on:
       - app
     networks:

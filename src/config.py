@@ -73,12 +73,6 @@ class Settings(BaseSettings):
     api_reload: bool = Field(default=True)
 
     # -----------------------------------------------------------------------------
-    # Streamlit
-    # -----------------------------------------------------------------------------
-    streamlit_port: int = Field(default=8501)
-    streamlit_server_address: str = Field(default="0.0.0.0")
-
-    # -----------------------------------------------------------------------------
     # Scheduler
     # -----------------------------------------------------------------------------
     pipeline_schedule_cron: str = Field(default="0 6 * * *", description="6 AM daily")
@@ -111,6 +105,10 @@ class Settings(BaseSettings):
     # -----------------------------------------------------------------------------
     secret_key: str = Field(default="change-me-in-production")
     allowed_hosts: str = Field(default="localhost,127.0.0.1")
+    pipeline_api_key: Optional[str] = Field(
+        default=None,
+        description="API key for POST /pipeline/run. If unset, endpoint is unprotected.",
+    )
 
     # -----------------------------------------------------------------------------
     # Feature Flags

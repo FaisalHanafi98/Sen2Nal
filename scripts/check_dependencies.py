@@ -117,7 +117,6 @@ def check_core_packages():
     packages = {
         "fastapi": "FastAPI",
         "uvicorn": "Uvicorn",
-        "streamlit": "Streamlit",
         "sqlalchemy": "SQLAlchemy",
         "alembic": "Alembic",
         "psycopg2": "psycopg2-binary",
@@ -375,7 +374,7 @@ def print_summary(checks):
         print("  2. docker-compose up -d postgres")
         print("  3. python -m poetry run alembic upgrade head")
         print("  4. python -m poetry run uvicorn src.api.main:app --reload")
-        print("  5. python -m poetry run streamlit run src/dashboard/app.py")
+        print("  5. Open http://localhost:8000/api/v1/docs")
     else:
         print_warning("SOME CHECKS FAILED")
         print("\n📝 Action Items:\n")
@@ -394,7 +393,7 @@ def print_summary(checks):
         print("\n💡 For Phase 0, you mainly need:")
         print("  ✓ Python 3.11+")
         print("  ✓ Poetry (or use: python -m poetry)")
-        print("  ✓ Core packages (FastAPI, Streamlit, SQLAlchemy)")
+        print("  ✓ Core packages (FastAPI, SQLAlchemy)")
         print("  ✓ Docker + PostgreSQL")
         print("\n  Other packages can be installed later as needed.")
 

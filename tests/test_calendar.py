@@ -17,6 +17,7 @@ from src.agents.calendar import (
     DOW_EFFECTS,
     MONTH_SEASONALITY,
     MONTH_WIN_RATES,
+    malaysian_market_holidays,
     us_market_holidays,
 )
 
@@ -198,3 +199,33 @@ class TestExecuteMethod:
     def test_execute_uses_provided_date(self, agent):
         result = agent.execute(target_date=date(2026, 6, 15), tickers=["AAPL"])
         assert result["target_date"] == "2026-06-15"
+
+
+# -- Malaysian holidays -------------------------------------------------------
+
+class TestMalaysianHolidays:
+
+    def test_2026_returns_holidays(self):
+        holidays = malaysian_market_holidays(2026)
+        assert len(holidays) >= 10
+
+    def test_hari_raya_2026_in_list(self):
+        holidays = malaysian_market_holidays(2026)
+        assert date(2026, 3, 20) in holidays  # Hari Raya Aidilfitri
+
+    def test_merdeka_day_in_list(self):
+        holidays = malaysian_market_holidays(2026)
+        assert date(2026, 8, 31) in holidays
+
+    def test_unknown_year_returns_fixed_holidays(self):
+        holidays = malaysian_market_holidays(2030)
+        assert date(2030, 8, 31) in holidays  # Merdeka Day
+        assert date(2030, 9, 16) in holidays  # Malaysia Day
+
+    def test_holiday_decay_includes_malaysian_holidays(self, agent):
+        """Holiday decay near Hari Raya should be stronger than a random date."""
+        # 2026-03-20 is Hari Raya Aidilfitri — should have strong decay
+        near_hari_raya = agent._holiday_decay(date(2026, 3, 19))
+        # 2026-08-15 is far from any holiday
+        far_date = agent._holiday_decay(date(2026, 8, 15))
+        assert abs(near_hari_raya) > abs(far_date)

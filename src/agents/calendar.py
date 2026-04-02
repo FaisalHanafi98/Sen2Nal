@@ -71,6 +71,62 @@ def us_market_holidays(year: int) -> list[date]:
         _observed(date(year, 12, 25)),         # Christmas
     ]
 
+
+# Malaysian public holidays (Bursa Malaysia closures).
+# Islamic calendar dates shift ~11 days/year; hardcoded for 2024-2027.
+_MY_HOLIDAYS: dict[int, list[date]] = {
+    2024: [
+        date(2024, 2, 10), date(2024, 2, 11),   # Chinese New Year
+        date(2024, 3, 28),                        # Nuzul Al-Quran
+        date(2024, 4, 10), date(2024, 4, 11),   # Hari Raya Aidilfitri
+        date(2024, 5, 1), date(2024, 5, 22),    # Labour Day, Vesak
+        date(2024, 6, 17), date(2024, 6, 18),   # Hari Raya Haji
+        date(2024, 7, 8),                        # Awal Muharram
+        date(2024, 8, 31), date(2024, 9, 16),   # Merdeka, Malaysia Day
+        date(2024, 11, 1), date(2024, 12, 25),  # Deepavali, Christmas
+    ],
+    2025: [
+        date(2025, 1, 29), date(2025, 1, 30),
+        date(2025, 3, 17),
+        date(2025, 3, 30), date(2025, 3, 31),
+        date(2025, 5, 1), date(2025, 5, 12),
+        date(2025, 6, 6), date(2025, 6, 7),
+        date(2025, 6, 27),
+        date(2025, 8, 31), date(2025, 9, 5), date(2025, 9, 16),
+        date(2025, 10, 20), date(2025, 12, 25),
+    ],
+    2026: [
+        date(2026, 2, 17), date(2026, 2, 18),
+        date(2026, 3, 6),
+        date(2026, 3, 20), date(2026, 3, 21),
+        date(2026, 5, 1), date(2026, 5, 27), date(2026, 5, 28),
+        date(2026, 6, 3), date(2026, 6, 17),
+        date(2026, 8, 26), date(2026, 8, 31), date(2026, 9, 16),
+        date(2026, 11, 8), date(2026, 12, 25),
+    ],
+    2027: [
+        date(2027, 2, 6), date(2027, 2, 7),
+        date(2027, 2, 24),
+        date(2027, 3, 10), date(2027, 3, 11),
+        date(2027, 5, 1), date(2027, 5, 17), date(2027, 5, 18), date(2027, 5, 20),
+        date(2027, 6, 7),
+        date(2027, 8, 16), date(2027, 8, 31), date(2027, 9, 16),
+        date(2027, 10, 29), date(2027, 12, 25),
+    ],
+}
+
+
+def malaysian_market_holidays(year: int) -> list[date]:
+    """Bursa Malaysia holidays. Falls back to fixed-date holidays for unknown years."""
+    if year in _MY_HOLIDAYS:
+        return _MY_HOLIDAYS[year]
+    # Fallback: fixed-date holidays only
+    return [
+        date(year, 1, 1), date(year, 2, 1), date(year, 5, 1),
+        date(year, 6, 3), date(year, 8, 31), date(year, 9, 16),
+        date(year, 12, 25),
+    ]
+
 # Day-of-week effect coefficients (Monday=0 .. Friday=4)
 # Research: Monday tends negative, Friday tends positive
 DOW_EFFECTS = {0: -0.15, 1: 0.05, 2: 0.02, 3: 0.08, 4: 0.10}
@@ -155,11 +211,16 @@ class CalendarAgent(BaseAgent):
         }
 
     def _holiday_decay(self, target: date) -> float:
-        """Compute holiday decay: e^(-n) where n = trading days to nearest holiday."""
+        """Compute holiday decay: e^(-n) where n = trading days to nearest holiday.
+
+        Checks both NYSE and Bursa Malaysia holidays since Sen2Nal covers
+        both S&P 500 and Bursa stocks.
+        """
         min_distance = 999
 
         for y in [target.year - 1, target.year, target.year + 1]:
-            for holiday in us_market_holidays(y):
+            all_holidays = us_market_holidays(y) + malaysian_market_holidays(y)
+            for holiday in all_holidays:
                 delta = abs((target - holiday).days)
                 trading_days = max(1, int(delta * 5 / 7))
                 min_distance = min(min_distance, trading_days)

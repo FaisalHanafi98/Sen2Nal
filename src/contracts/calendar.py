@@ -16,8 +16,10 @@ class CalendarOutput(StrictContract):
 
     ticker: str = Field(min_length=1, max_length=10)
     date: date
-    holiday_decay: float = Field(ge=0.0, le=1.0)
+    holiday_decay: float = Field(ge=-1.0, le=0.0)
     day_of_week_effect: float = Field(ge=-1.0, le=1.0)
     earnings_proximity: int | None = Field(default=None, ge=0)
+    month_avg_return: float = Field(ge=-1.0, le=1.0)
+    month_win_rate: float = Field(ge=0.0, le=1.0)
     trading_day_of_month: int = Field(ge=1, le=23)
     calendar_score: float = Field(ge=-1.0, le=1.0)

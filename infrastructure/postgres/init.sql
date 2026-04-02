@@ -4,6 +4,12 @@
 -- Create database if not exists (Docker will create it via env vars)
 -- CREATE DATABASE sen2nal;
 
+-- Ensure user exists with password (development configuration)
+ALTER USER sen2nal_user WITH PASSWORD 'sen2nal_password';
+
+-- Create test database for local test runs
+CREATE DATABASE sen2nal_test OWNER sen2nal_user;
+
 -- Enable UUID extension (if needed)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

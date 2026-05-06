@@ -101,6 +101,7 @@ NUL
 tmp/
 temp/
 *.tmp
+.memsearch/
 
 # Documentation build
 docs/_build/

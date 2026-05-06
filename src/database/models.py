@@ -6,9 +6,6 @@ Schema follows star design:
 - Fact tables (fact_*): Transactional/metrics data
 """
 
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import (
     JSON,
@@ -196,7 +193,7 @@ class FactSentiment(Base):
         Index(
             "idx_fact_sentiment_conflict",
             "conflict_flag",
-            postgresql_where=Column("conflict_flag") == True,
+            postgresql_where=Column("conflict_flag").is_(True),
         ),
     )
 
@@ -387,7 +384,7 @@ class StgNewsRaw(Base):
             "idx_stg_news_unprocessed",
             "is_processed",
             "fetched_at",
-            postgresql_where=Column("is_processed") == False,
+            postgresql_where=Column("is_processed").is_(False),
         ),
     )
 
@@ -424,7 +421,7 @@ class StgRedditRaw(Base):
             "idx_stg_reddit_unprocessed",
             "is_processed",
             "fetched_at",
-            postgresql_where=Column("is_processed") == False,
+            postgresql_where=Column("is_processed").is_(False),
         ),
     )
 

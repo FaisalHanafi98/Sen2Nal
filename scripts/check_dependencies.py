@@ -343,7 +343,7 @@ def check_database_connection():
             print_info("3. Check .env DATABASE_URL setting")
             return False
     except ImportError as e:
-        print_warning(f"Cannot test database (missing dependencies)")
+        print_warning("Cannot test database (missing dependencies)")
         print_info(f"Error: {e}")
         return False
     except Exception as e:
@@ -402,7 +402,7 @@ def print_summary(checks):
 def main():
     """Run all checks."""
     print(f"\n{Colors.BOLD}{'=' * 80}")
-    print(f"🔍 Sen2Nal Dependency Checker")
+    print("🔍 Sen2Nal Dependency Checker")
     print(f"{'=' * 80}{Colors.RESET}\n")
 
     checks = {}

@@ -1,6 +1,5 @@
 """Stock and signal endpoints for the React frontend."""
 
-from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response

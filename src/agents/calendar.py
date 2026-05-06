@@ -12,11 +12,8 @@ import math
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from src.agents.base import BaseAgent
-from src.database.models import DimCalendar, DimStock
 
 
 def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:

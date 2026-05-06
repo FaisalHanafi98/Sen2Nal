@@ -12,6 +12,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.api.routers.alerts import router as alerts_router
+from src.api.routers.experiments import router as experiments_router
+from src.api.routers.pipeline import router as pipeline_router
+from src.api.routers.stocks import router as stocks_router
 from src.config import settings
 from src.constants import API_VERSION
 
@@ -156,15 +160,6 @@ async def internal_error_handler(request, exc):
         },
     )
 
-
-# =============================================================================
-# Routers
-# =============================================================================
-
-from src.api.routers.stocks import router as stocks_router
-from src.api.routers.experiments import router as experiments_router
-from src.api.routers.pipeline import router as pipeline_router
-from src.api.routers.alerts import router as alerts_router
 
 app.include_router(stocks_router)
 app.include_router(experiments_router)

@@ -1,7 +1,7 @@
 """Pipeline monitoring and control endpoints."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Header, HTTPException
 from sqlalchemy import select, func
@@ -37,11 +37,11 @@ def get_pipeline_status(db: Session = Depends(get_db)):
     """Get pipeline stage statuses — powers the pipeline flow diagram."""
     news_total = db.execute(select(func.count(StgNewsRaw.raw_id))).scalar() or 0
     news_processed = db.execute(
-        select(func.count(StgNewsRaw.raw_id)).where(StgNewsRaw.is_processed == True)
+        select(func.count(StgNewsRaw.raw_id)).where(StgNewsRaw.is_processed.is_(True))
     ).scalar() or 0
     reddit_total = db.execute(select(func.count(StgRedditRaw.raw_id))).scalar() or 0
     reddit_processed = db.execute(
-        select(func.count(StgRedditRaw.raw_id)).where(StgRedditRaw.is_processed == True)
+        select(func.count(StgRedditRaw.raw_id)).where(StgRedditRaw.is_processed.is_(True))
     ).scalar() or 0
     sentiment_count = db.execute(select(func.count(FactSentiment.sentiment_id))).scalar() or 0
     price_count = db.execute(select(func.count(FactPrice.price_id))).scalar() or 0
@@ -96,8 +96,11 @@ def get_pipeline_status(db: Session = Depends(get_db)):
     pipeline_status = "idle"
     last_run_time = None
     if latest_run:
-        pipeline_status = latest_run.status
-        last_run_time = str(latest_run.started_at) if latest_run.started_at else None
+        latest_run_record = cast(Any, latest_run)
+        pipeline_status = latest_run_record.status
+        last_run_time = (
+            str(latest_run_record.started_at) if latest_run_record.started_at else None
+        )
 
     return {
         "pipelineStatus": pipeline_status,
@@ -133,7 +136,6 @@ def get_pipeline_logs(limit: int = 50, db: Session = Depends(get_db)):
 @router.post("/run", dependencies=[Depends(verify_pipeline_key)])
 def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Trigger a full pipeline run in the background."""
-    from src.pipeline.runner import run_full_pipeline
     import uuid
 
     run_id = f"pipeline_{uuid.uuid4().hex[:8]}"
@@ -166,9 +168,10 @@ async def _run_pipeline_background(run_id: str):
         ).scalar_one_or_none()
 
         if pipeline_run:
-            pipeline_run.status = result.get("overall_status", "unknown")
-            pipeline_run.finished_at = datetime.utcnow()
-            pipeline_run.result_json = result
+            pipeline_run_record = cast(Any, pipeline_run)
+            pipeline_run_record.status = result.get("overall_status", "unknown")
+            pipeline_run_record.finished_at = datetime.utcnow()
+            pipeline_run_record.result_json = result
 
             # Write stage results as log entries
             for stage_name, stage_data in result.get("stages", {}).items():
@@ -176,7 +179,7 @@ async def _run_pipeline_background(run_id: str):
                 elapsed = stage_data.get("elapsed_seconds", 0)
                 level = "success" if status == "success" else "error"
                 db.add(PipelineLog(
-                    run_id=pipeline_run.id,
+                    run_id=pipeline_run_record.id,
                     stage=stage_name,
                     level=level,
                     message=f"{stage_name} {status} ({elapsed:.1f}s)",
@@ -188,11 +191,12 @@ async def _run_pipeline_background(run_id: str):
             select(PipelineRun).where(PipelineRun.run_id == run_id)
         ).scalar_one_or_none()
         if pipeline_run:
-            pipeline_run.status = "failed"
-            pipeline_run.finished_at = datetime.utcnow()
-            pipeline_run.result_json = {"error": str(e)}
+            pipeline_run_record = cast(Any, pipeline_run)
+            pipeline_run_record.status = "failed"
+            pipeline_run_record.finished_at = datetime.utcnow()
+            pipeline_run_record.result_json = {"error": str(e)}
             db.add(PipelineLog(
-                run_id=pipeline_run.id,
+                run_id=pipeline_run_record.id,
                 stage="system",
                 level="error",
                 message=f"Pipeline crashed: {e}",

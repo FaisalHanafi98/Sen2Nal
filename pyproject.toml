@@ -5,6 +5,7 @@ description = "Stock Sentiment + Calendar Signal Analysis System"
 authors = ["Faisal (Mohamad Faisal Bin Mohd Hanafi)"]
 readme = "README.md"
 license = "MIT"
+packages = [{ include = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"

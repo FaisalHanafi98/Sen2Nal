@@ -13,12 +13,10 @@ import hashlib
 import logging
 import time
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
-import requests
+import requests  # type: ignore[import-untyped]
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
 
 from src.agents.base import BaseAgent
 from src.config import settings
@@ -83,10 +81,7 @@ class IngestionAgent(BaseAgent):
 
     def _ensure_stocks(self, tickers: list[str]) -> None:
         """Insert any missing tickers into dim_stocks."""
-        existing = {
-            row.ticker
-            for row in self.db.execute(select(DimStock.ticker)).scalars()
-        }
+        existing = set(self.db.execute(select(DimStock.ticker)).scalars().all())
         missing = set(tickers) - existing
         if not missing:
             return
@@ -410,9 +405,9 @@ class IngestionAgent(BaseAgent):
         if date_id:
             return date_id
         self._ensure_calendar(d)
-        return self.db.execute(
+        return cast(int, self.db.execute(
             select(DimCalendar.date_id).where(DimCalendar.date == d)
-        ).scalar()
+        ).scalar())
 
 
 # =============================================================================

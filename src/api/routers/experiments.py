@@ -1,6 +1,6 @@
 """Experiment tracking endpoints — AI vs AI comparison."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy import Integer, select, func, desc
 from sqlalchemy.orm import Session
 
@@ -28,8 +28,9 @@ def get_experiments(
 
     weeks: dict[int, list] = {}
     for exp in rows:
-        if exp.week_number not in weeks:
-            weeks[exp.week_number] = []
+        week_number = int(exp.week_number)
+        if week_number not in weeks:
+            weeks[week_number] = []
 
         stocks = []
         for i in range(1, 4):
@@ -44,8 +45,8 @@ def get_experiments(
                 "return": float(ret) if ret else None,
             })
 
-        weeks[exp.week_number].append({
-            "weekNumber": exp.week_number,
+        weeks[week_number].append({
+            "weekNumber": week_number,
             "method": exp.method,
             "stocks": stocks,
             "weeklyReturn": float(exp.weekly_return) if exp.weekly_return else None,

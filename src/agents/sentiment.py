@@ -11,10 +11,9 @@ Processes raw news and Reddit posts using FinBERT for financial sentiment analys
 import logging
 import math
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
-import numpy as np
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.agents.base import BaseAgent
@@ -74,8 +73,9 @@ class SentimentAgent(BaseAgent):
             self._tokenizer = AutoTokenizer.from_pretrained(model_name)
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
             self._model = AutoModelForSequenceClassification.from_pretrained(model_name)
-            self._model.to(self._device)
-            self._model.eval()
+            model = cast(Any, self._model)
+            model.to(self._device)
+            model.eval()
             self._model_type = "finbert"
             self.logger.info(f"FinBERT loaded on {self._device}")
         except Exception as e:
@@ -111,7 +111,10 @@ class SentimentAgent(BaseAgent):
         """Score text using FinBERT. Returns (score, confidence)."""
         import torch
 
-        inputs = self._tokenizer(
+        tokenizer = cast(Any, self._tokenizer)
+        model = cast(Any, self._model)
+
+        inputs = tokenizer(
             text,
             return_tensors="pt",
             truncation=True,
@@ -121,7 +124,7 @@ class SentimentAgent(BaseAgent):
         inputs = {k: v.to(self._device) for k, v in inputs.items()}
 
         with torch.no_grad():
-            outputs = self._model(**inputs)
+            outputs = model(**inputs)
             probs = torch.softmax(outputs.logits, dim=-1)[0]
 
         # FinBERT labels: positive=0, negative=1, neutral=2
@@ -135,7 +138,8 @@ class SentimentAgent(BaseAgent):
 
     def _score_vader(self, text: str) -> tuple[float, float]:
         """Score text using VADER. Returns (score, confidence)."""
-        scores = self._model.polarity_scores(text)
+        model = cast(Any, self._model)
+        scores = model.polarity_scores(text)
         compound = scores["compound"]  # Already -1 to +1
         # Confidence from the absolute compound + non-neutral proportion
         confidence = abs(compound) * 0.5 + (1.0 - scores["neu"]) * 0.5
@@ -153,7 +157,10 @@ class SentimentAgent(BaseAgent):
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            inputs = self._tokenizer(
+            tokenizer = cast(Any, self._tokenizer)
+            model = cast(Any, self._model)
+
+            inputs = tokenizer(
                 batch,
                 return_tensors="pt",
                 truncation=True,
@@ -163,7 +170,7 @@ class SentimentAgent(BaseAgent):
             inputs = {k: v.to(self._device) for k, v in inputs.items()}
 
             with torch.no_grad():
-                outputs = self._model(**inputs)
+                outputs = model(**inputs)
                 probs = torch.softmax(outputs.logits, dim=-1)
 
             for j in range(len(batch)):
@@ -183,7 +190,7 @@ class SentimentAgent(BaseAgent):
     def _process_news(self) -> int:
         """Score unprocessed news articles and update staging records."""
         unprocessed = self.db.execute(
-            select(StgNewsRaw).where(StgNewsRaw.is_processed == False).limit(500)
+            select(StgNewsRaw).where(StgNewsRaw.is_processed.is_(False)).limit(500)
         ).scalars().all()
 
         if not unprocessed:
@@ -195,10 +202,11 @@ class SentimentAgent(BaseAgent):
 
         now = datetime.utcnow()
         for record, (score, confidence) in zip(unprocessed, scores):
-            record.sentiment_score = score
-            record.sentiment_label = _classify_sentiment(score)
-            record.is_processed = True
-            record.processed_at = now
+            record_any = cast(Any, record)
+            record_any.sentiment_score = score
+            record_any.sentiment_label = _classify_sentiment(score)
+            record_any.is_processed = True
+            record_any.processed_at = now
 
         self.db.flush()
         self.logger.info(f"Scored {len(unprocessed)} news articles")
@@ -207,7 +215,7 @@ class SentimentAgent(BaseAgent):
     def _process_reddit(self) -> int:
         """Score unprocessed Reddit posts and update staging records."""
         unprocessed = self.db.execute(
-            select(StgRedditRaw).where(StgRedditRaw.is_processed == False).limit(500)
+            select(StgRedditRaw).where(StgRedditRaw.is_processed.is_(False)).limit(500)
         ).scalars().all()
 
         if not unprocessed:
@@ -219,10 +227,11 @@ class SentimentAgent(BaseAgent):
 
         now = datetime.utcnow()
         for record, (score, confidence) in zip(unprocessed, scores):
-            record.sentiment_score = score
-            record.sentiment_label = _classify_sentiment(score)
-            record.is_processed = True
-            record.processed_at = now
+            record_any = cast(Any, record)
+            record_any.sentiment_score = score
+            record_any.sentiment_label = _classify_sentiment(score)
+            record_any.is_processed = True
+            record_any.processed_at = now
 
         self.db.flush()
         self.logger.info(f"Scored {len(unprocessed)} Reddit posts")

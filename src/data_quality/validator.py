@@ -13,9 +13,9 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from src.contracts.base import DataContractViolation
 from src.contracts.calendar import CalendarOutput
@@ -24,7 +24,7 @@ from src.contracts.ingestion import IngestionOutput
 from src.contracts.prediction import PredictionOutput
 from src.contracts.sentiment import SentimentOutput
 
-STAGE_CONTRACTS: dict[str, type] = {
+STAGE_CONTRACTS: dict[str, type[BaseModel]] = {
     "ingestion": IngestionOutput,
     "sentiment": SentimentOutput,
     "calendar": CalendarOutput,
@@ -90,7 +90,7 @@ def validate_stage(
         try:
             contract.model_validate(record)
         except ValidationError as e:
-            errors.append(StageError(index=i, errors=e.errors()))
+            errors.append(StageError(index=i, errors=cast(list[dict[str, Any]], e.errors())))
 
     result = ValidationResult(stage=stage, total=len(records), errors=errors)
 

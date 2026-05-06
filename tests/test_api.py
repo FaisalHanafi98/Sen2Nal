@@ -5,9 +5,9 @@ These tests verify endpoint routing, response shapes, and status codes
 without requiring real pipeline data.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from src.constants import API_VERSION, ALLOWED_TICKERS, FOOTER_DISCLAIMER
+from src.constants import API_VERSION, FOOTER_DISCLAIMER
 
 
 class TestRootEndpoint:

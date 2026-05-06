@@ -5,7 +5,7 @@ No real API calls are made in tests.
 """
 
 from datetime import date, datetime
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

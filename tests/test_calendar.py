@@ -6,7 +6,6 @@ holiday decay, day-of-week effects, month seasonality,
 earnings proximity, and composite scoring.
 """
 
-import math
 from datetime import date
 from unittest.mock import MagicMock
 
@@ -15,10 +14,7 @@ import pytest
 from src.agents.calendar import (
     CalendarAgent,
     DOW_EFFECTS,
-    MONTH_SEASONALITY,
-    MONTH_WIN_RATES,
     malaysian_market_holidays,
-    us_market_holidays,
 )
 
 
@@ -172,11 +168,7 @@ class TestCompositeSignal:
         """Near-earnings dates should produce amplified scores vs same date far from earnings."""
         # Compare a date near earnings vs one far away, same day-of-week
         near = agent._compute_signal("AAPL", date(2026, 4, 13))  # 2 days from Apr 15
-        far = agent._compute_signal("AAPL", date(2026, 5, 11))   # Far from any earnings
-
         near_prox = near["earnings_proximity"]
-        far_prox = far["earnings_proximity"]
-
         if near_prox is not None and near_prox <= 7:
             # The near-earnings score should be amplified (1.3x factor)
             # Can't compare directly because other factors differ,

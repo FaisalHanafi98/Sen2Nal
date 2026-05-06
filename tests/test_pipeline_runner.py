@@ -7,7 +7,6 @@ propagates results correctly on success.
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.pipeline.runner import run_full_pipeline
 

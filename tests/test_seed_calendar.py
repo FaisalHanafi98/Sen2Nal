@@ -5,7 +5,6 @@ Verifies US and Malaysian holiday computation and calendar row generation.
 
 from datetime import date
 
-import pytest
 
 from scripts.seed_calendar import (
     _malaysian_public_holidays,

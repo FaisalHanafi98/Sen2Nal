@@ -11,16 +11,15 @@ Each week:
 """
 
 import logging
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import select, and_, func
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from src.agents.base import BaseAgent
 from src.config import settings
-from src.constants import EXPERIMENT_METHODS, LLM_EXPERIMENT_PROMPT
+from src.constants import LLM_EXPERIMENT_PROMPT
 from src.database.models import DimStock, FactExperiment, FactPrice, FactSentiment
 
 logger = logging.getLogger(__name__)
@@ -216,31 +215,33 @@ class ExperimentAgent(BaseAgent):
 
         returns = {}
         for exp in experiments:
-            s1_exit = self._get_latest_price(exp.stock_1_ticker)
-            s2_exit = self._get_latest_price(exp.stock_2_ticker)
-            s3_exit = self._get_latest_price(exp.stock_3_ticker)
+            exp_record = cast(Any, exp)
+            s1_exit = self._get_latest_price(exp_record.stock_1_ticker)
+            s2_exit = self._get_latest_price(exp_record.stock_2_ticker)
+            s3_exit = self._get_latest_price(exp_record.stock_3_ticker)
 
-            s1_ret = _calc_return(exp.stock_1_entry, s1_exit)
-            s2_ret = _calc_return(exp.stock_2_entry, s2_exit)
-            s3_ret = _calc_return(exp.stock_3_entry, s3_exit)
+            s1_ret = _calc_return(exp_record.stock_1_entry, s1_exit)
+            s2_ret = _calc_return(exp_record.stock_2_entry, s2_exit)
+            s3_ret = _calc_return(exp_record.stock_3_entry, s3_exit)
             weekly = round((s1_ret + s2_ret + s3_ret) / 3, 5)
 
-            exp.exit_date = exit_date
-            exp.stock_1_exit = Decimal(str(s1_exit))
-            exp.stock_2_exit = Decimal(str(s2_exit))
-            exp.stock_3_exit = Decimal(str(s3_exit))
-            exp.stock_1_return = Decimal(str(s1_ret))
-            exp.stock_2_return = Decimal(str(s2_ret))
-            exp.stock_3_return = Decimal(str(s3_ret))
-            exp.weekly_return = Decimal(str(weekly))
+            exp_record.exit_date = exit_date
+            exp_record.stock_1_exit = Decimal(str(s1_exit))
+            exp_record.stock_2_exit = Decimal(str(s2_exit))
+            exp_record.stock_3_exit = Decimal(str(s3_exit))
+            exp_record.stock_1_return = Decimal(str(s1_ret))
+            exp_record.stock_2_return = Decimal(str(s2_ret))
+            exp_record.stock_3_return = Decimal(str(s3_ret))
+            exp_record.weekly_return = Decimal(str(weekly))
 
-            returns[exp.method] = weekly
+            returns[exp_record.method] = weekly
 
         # Determine winner
         if returns:
-            winner = max(returns, key=returns.get)
+            winner = max(returns, key=lambda method: returns[method])
             for exp in experiments:
-                exp.is_winner = (exp.method == winner)
+                exp_record = cast(Any, exp)
+                exp_record.is_winner = exp_record.method == winner
 
         self.db.flush()
         return {"status": "closed", "returns": returns, "winner": winner if returns else None}
@@ -271,7 +272,7 @@ class ExperimentAgent(BaseAgent):
 
     def _call_llm(self, method: str, api_key: str, prompt: str) -> tuple[str, str]:
         """Call LLM API and return (response_text, model_version)."""
-        import requests
+        import requests  # type: ignore[import-untyped]
 
         if method == "CHATGPT":
             resp = requests.post(

@@ -10,10 +10,8 @@ Verifies that:
 from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.agents.base import BaseAgent
-from src.contracts.base import DataContractViolation
 
 
 # -- Helpers: concrete agents for testing ------------------------------------

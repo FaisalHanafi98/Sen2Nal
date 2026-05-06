@@ -4,16 +4,14 @@ Verifies model creation, constraints, and foreign key relationships
 against a real PostgreSQL database (via conftest fixtures).
 """
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
 from src.database.models import (
     DimCalendar,
-    DimFearGreed,
     DimStock,
-    FactExperiment,
     FactPrediction,
     FactPrice,
     FactSentiment,

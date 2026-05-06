@@ -13,7 +13,7 @@ Can be triggered via:
 import logging
 import uuid
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -62,14 +62,14 @@ def run_full_pipeline(
         agent = agent_cls(db, run_id)
         result = agent.run(**kwargs)
         results["stages"][name] = result
-        return result
+        return cast(dict[str, Any], result)
 
     def _halt(failed_stage: str) -> dict[str, Any]:
         results["overall_status"] = "failed"
         results["failed_at"] = failed_stage
         results["failed_stages"] = [failed_stage]
         logger.error(f"[{run_id}] Pipeline halted at {failed_stage}")
-        return results
+        return cast(dict[str, Any], results)
 
     # Stage 1: Ingestion — upstream data source, must succeed
     ingestion_result = _run_stage("ingestion", IngestionAgent,

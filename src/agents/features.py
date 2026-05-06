@@ -9,12 +9,9 @@ Combines NLP sentiment, calendar signals, and market data into feature vectors.
 """
 
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from typing import Any
 
-import numpy as np
-from sqlalchemy import select, and_
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from src.agents.base import BaseAgent
 from src.agents.calendar import CalendarAgent
@@ -24,7 +21,6 @@ from src.constants import SIGNAL_THRESHOLDS, SignalType
 from src.database.models import (
     DimCalendar,
     DimStock,
-    FactPrice,
     FactSentiment,
     StgNewsRaw,
     StgRedditRaw,
@@ -167,7 +163,7 @@ class FeatureAgent(BaseAgent):
 
         news = self.db.execute(
             select(StgNewsRaw).where(
-                StgNewsRaw.is_processed == True,
+                StgNewsRaw.is_processed.is_(True),
                 StgNewsRaw.tickers_mentioned.contains([ticker]),
                 StgNewsRaw.published_at >= lookback,
             )
@@ -175,13 +171,17 @@ class FeatureAgent(BaseAgent):
 
         reddit = self.db.execute(
             select(StgRedditRaw).where(
-                StgRedditRaw.is_processed == True,
+                StgRedditRaw.is_processed.is_(True),
                 StgRedditRaw.tickers_mentioned.contains([ticker]),
                 StgRedditRaw.created_utc >= lookback,
             )
         ).scalars().all()
 
-        return aggregate_ticker_sentiment(news, reddit, datetime.combine(target, datetime.min.time()))
+        return aggregate_ticker_sentiment(
+            list(news),
+            list(reddit),
+            datetime.combine(target, datetime.min.time()),
+        )
 
     def _get_previous_sentiment(self, stock_id: int, date_id: int) -> dict | None:
         """Get previous day's sentiment for momentum calculation."""

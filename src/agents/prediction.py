@@ -13,8 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from sqlalchemy import select, and_, func
-from sqlalchemy.orm import Session
+from sqlalchemy import select, and_
 
 from src.agents.base import BaseAgent
 from src.database.models import DimCalendar, DimStock, FactPrediction, FactPrice, FactSentiment
@@ -219,13 +218,6 @@ class PredictionAgent(BaseAgent):
             proba = model.predict_proba(features)[0]
             direction = int(np.argmax(proba))
             probability = float(proba[direction])
-
-            if probability >= 0.65:
-                conf = "high"
-            elif probability >= 0.55:
-                conf = "medium"
-            else:
-                conf = "low"
 
             # SHAP values
             shap_dict = {}

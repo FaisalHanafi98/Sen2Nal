@@ -20,7 +20,7 @@ def get_alerts(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_d
     conflicts = db.execute(
         select(FactSentiment, DimStock)
         .join(DimStock, FactSentiment.stock_id == DimStock.stock_id)
-        .where(FactSentiment.conflict_flag == True)
+        .where(FactSentiment.conflict_flag.is_(True))
         .order_by(desc(FactSentiment.date_id))
         .limit(10)
     ).all()
@@ -84,7 +84,7 @@ def get_alerts(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_d
             "type": "momentum_shift",
             "severity": "info",
             "ticker": stock.ticker,
-            "message": f"Sentiment momentum turned positive",
+            "message": "Sentiment momentum turned positive",
             "score": float(sent.nlp_score) if sent.nlp_score else 0,
         })
 

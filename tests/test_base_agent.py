@@ -1,5 +1,6 @@
 """Tests for BaseAgent run() wrapper behavior."""
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 from src.agents.base import BaseAgent
@@ -74,7 +75,7 @@ class TestValidationHook:
                         "confidence": 0.8,
                         "source_count": 3,
                         "model_used": "finbert",
-                        "processing_timestamp": "2026-03-20T15:00:00",
+                        "processing_timestamp": datetime(2026, 3, 20, 15, 0, 0),
                     }
                 ]
             },

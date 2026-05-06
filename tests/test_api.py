@@ -7,7 +7,7 @@ without requiring real pipeline data.
 
 from unittest.mock import patch, MagicMock
 
-from src.constants import API_VERSION, ALLOWED_TICKERS
+from src.constants import API_VERSION, ALLOWED_TICKERS, FOOTER_DISCLAIMER
 
 
 class TestRootEndpoint:
@@ -22,7 +22,7 @@ class TestRootEndpoint:
 
 class TestHealthEndpoint:
 
-    @patch("src.api.main.check_db_connection", return_value=True)
+    @patch("src.database.connection.check_db_connection", return_value=True)
     def test_health_connected(self, mock_db, client):
         response = client.get(f"/api/{API_VERSION}/health")
         assert response.status_code == 200
@@ -30,7 +30,7 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
         assert data["database"] == "connected"
 
-    @patch("src.api.main.check_db_connection", return_value=False)
+    @patch("src.database.connection.check_db_connection", return_value=False)
     def test_health_degraded(self, mock_db, client):
         response = client.get(f"/api/{API_VERSION}/health")
         assert response.status_code == 200
@@ -44,7 +44,8 @@ class TestStocksEndpoints:
         response = client.get(f"/api/{API_VERSION}/stocks")
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
+        assert data["stocks"] == []
+        assert data["disclaimer"] == FOOTER_DISCLAIMER
 
     def test_stocks_with_seed(self, client, seed_stock):
         response = client.get(f"/api/{API_VERSION}/stocks")
@@ -76,7 +77,7 @@ class TestPipelineEndpoints:
         response = client.get(f"/api/{API_VERSION}/pipeline/logs")
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
+        assert data["logs"] == []
 
 
 class TestAlertsEndpoint:
@@ -85,7 +86,7 @@ class TestAlertsEndpoint:
         response = client.get(f"/api/{API_VERSION}/alerts")
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
+        assert data["alerts"] == []
 
 
 class TestTickerWhitelist:
@@ -114,7 +115,8 @@ class TestPipelineAuth:
         assert response.status_code == 403
 
     @patch("src.api.routers.pipeline.settings")
-    def test_pipeline_run_accepts_valid_key(self, mock_settings, client):
+    @patch("src.api.routers.pipeline._run_pipeline_background")
+    def test_pipeline_run_accepts_valid_key(self, mock_background, mock_settings, client):
         mock_settings.pipeline_api_key = "secret-key-123"
         response = client.post(
             f"/api/{API_VERSION}/pipeline/run",

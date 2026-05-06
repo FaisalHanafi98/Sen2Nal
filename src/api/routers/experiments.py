@@ -1,7 +1,7 @@
 """Experiment tracking endpoints — AI vs AI comparison."""
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, desc
+from sqlalchemy import Integer, select, func, desc
 from sqlalchemy.orm import Session
 
 from src.constants import API_PREFIX, EXPERIMENT_DISCLAIMER
@@ -70,7 +70,7 @@ def get_experiment_summary(db: Session = Depends(get_db)):
             func.sum(FactExperiment.weekly_return).label("total_return"),
             func.avg(FactExperiment.weekly_return).label("avg_return"),
             func.sum(
-                func.cast(FactExperiment.is_winner, type_=func.literal(1).type)
+                func.cast(FactExperiment.is_winner, Integer)
             ).label("wins"),
         )
         .where(FactExperiment.weekly_return.isnot(None))

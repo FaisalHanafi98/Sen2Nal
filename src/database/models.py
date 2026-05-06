@@ -447,7 +447,13 @@ class PipelineRun(Base):
     finished_at = Column(DateTime)
     result_json = Column(JSON)
 
-    logs = relationship("PipelineLog", back_populates="run", order_by="PipelineLog.timestamp")
+    logs = relationship(
+        "PipelineLog",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PipelineLog.timestamp",
+    )
 
 
 class PipelineLog(Base):

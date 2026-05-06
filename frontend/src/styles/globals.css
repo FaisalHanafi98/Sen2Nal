@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  /* NightOps Color System */
+  --color-nightops-bg: #0A0E17;
+  --color-nightops-card: #111827;
+  --color-nightops-elevated: #1A1F2E;
+  --color-nightops-cyan: #06B6D4;
+  --color-nightops-purple: #8B5CF6;
+  --color-nightops-bullish: #10B981;
+  --color-nightops-warning: #F59E0B;
+  --color-nightops-bearish: #EF4444;
+  --color-nightops-text: #F1F5F9;
+  --color-nightops-secondary: #94A3B8;
+  --color-nightops-muted: #64748B;
+  --color-nightops-border: #1E293B;
+
+  /* Typography */
+  --font-header: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Base styles */
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-nightops-bg);
+  color: var(--color-nightops-text);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-nightops-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-nightops-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-nightops-muted);
+}
+
+/* Glow utilities */
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.15), 0 0 40px rgba(6, 182, 212, 0.05);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 0 40px rgba(139, 92, 246, 0.05);
+}
+
+.glow-bullish {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), 0 0 40px rgba(16, 185, 129, 0.05);
+}
+
+.glow-bearish {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15), 0 0 40px rgba(239, 68, 68, 0.05);
+}
+
+/* Pulsing dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Flow line animation for pipeline */
+@keyframes flow-line {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-flow {
+  animation: flow-line 1s linear infinite;
+}

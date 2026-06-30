@@ -5,8 +5,10 @@
 [![CI](https://github.com/FaisalHanafi98/Sen2Nal/actions/workflows/ci.yml/badge.svg)](https://github.com/FaisalHanafi98/Sen2Nal/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-red.svg)](https://streamlit.io)
+[![React](https://img.shields.io/badge/React-18+-61dafb.svg)](https://react.dev)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> **Last refreshed**: 2026-05-19 — stale Streamlit references removed; structure aligned with 6-agent pipeline and React frontend. Current verified status: see [docs/audits/CURRENT_SYSTEM_STATE.md](docs/audits/CURRENT_SYSTEM_STATE.md).
 
 ---
 
@@ -62,9 +64,10 @@ Sen2Nal is a stock sentiment analysis platform that combines:
 │                     AWS CLOUD INFRASTRUCTURE                     │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │                    EC2 (t3.medium)                        │  │
-│  │  Ingestion → Processing → FinBERT Scoring → FastAPI       │  │
-│  │                                              ↓            │  │
-│  │                                         Streamlit UI       │  │
+│  │  Ingestion → Sentiment → Calendar → Features →            │  │
+│  │  Prediction → Experiment → FastAPI                        │  │
+│  │                              ↓                            │  │
+│  │                       React (Vite) UI                     │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │          │                                        │              │
 │          ▼                                        ▼              │
@@ -89,42 +92,41 @@ Sen2Nal is a stock sentiment analysis platform that combines:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/sen2nal.git
-cd sen2nal
+git clone https://github.com/FaisalHanafi98/Sen2Nal.git
+cd Sen2Nal
 
-# 2. Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
+# 2. Install backend dependencies (Poetry)
+poetry install
 
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Set up environment variables
+# 3. Set up environment variables
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your API keys (NewsAPI, Reddit, Alpha Vantage)
 
-# 5. Start PostgreSQL (Docker)
+# 4. Start PostgreSQL (Docker)
 docker-compose up -d postgres
 
-# 6. Run database migrations
-alembic upgrade head
+# 5. Run database migrations
+poetry run alembic upgrade head
 
-# 7. Seed initial data
-python scripts/seed_database.py
+# 6. Seed calendar (NYSE + Bursa holidays 2024-2027)
+poetry run python scripts/seed_calendar.py
 
-# 8. Start API server
-uvicorn src.api.main:app --reload --port 8000
+# 7. Start API server
+poetry run uvicorn src.api.main:app --reload --port 8000
 
-# 9. Start Dashboard (new terminal)
-streamlit run src/dashboard/app.py --server.port 8501
+# 8. Start React frontend (new terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Access
 
-- **Dashboard:** http://localhost:8501
-- **API Docs:** http://localhost:8000/docs
+- **Frontend (Vite dev):** http://localhost:5173
+- **API Docs (Swagger):** http://localhost:8000/docs
 - **ReDoc:** http://localhost:8000/redoc
+
+> **Verification status**: end-to-end frontend↔backend wiring is **not yet verified** — see [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) KI-008.
 
 ---
 
@@ -132,21 +134,32 @@ streamlit run src/dashboard/app.py --server.port 8501
 
 ```
 sen2nal/
-├── infrastructure/          # AWS CloudFormation, deploy scripts
-├── notebooks/               # Jupyter notebooks for analysis
 ├── src/
-│   ├── ingestion/           # Data collection from APIs
-│   ├── processing/          # Text cleaning, deduplication
-│   ├── sentiment/           # FinBERT scoring
-│   ├── calendar/            # Seasonal pattern analysis
-│   ├── features/            # Feature engineering, signal combining
-│   ├── models/              # XGBoost training, SHAP
-│   ├── database/            # SQLAlchemy models, repositories
-│   ├── api/                 # FastAPI application
-│   └── dashboard/           # Streamlit UI
-├── tests/                   # Unit and integration tests
-├── scripts/                 # Utility scripts
-└── docs/                    # Documentation
+│   ├── agents/         # 6 pipeline agents (base + ingestion/sentiment/
+│   │                   # calendar/features/prediction/experiment)
+│   ├── api/            # FastAPI app + routers (stocks, experiments,
+│   │                   # pipeline, alerts)
+│   ├── contracts/      # Pydantic data contracts per stage
+│   ├── data_quality/   # Stage validator
+│   ├── database/       # SQLAlchemy models, Alembic migrations
+│   ├── pipeline/       # Runner (orchestrator) + scheduler
+│   ├── config.py       # Pydantic Settings
+│   └── constants.py    # ALLOWED_TICKERS whitelist
+├── frontend/           # React + Vite + TS + Tailwind (NightOps Terminal)
+│   └── src/{pages,components,api,hooks,types}
+├── tests/              # 13 pytest files (~2.1k LOC)
+├── scripts/            # smoke_test, seed_calendar, check_setup,
+│                       # check_dependencies
+├── infrastructure/     # docker, nginx, deploy-lightsail.sh (UNPROVEN)
+├── docs/
+│   ├── adr/            # 5 Architecture Decision Records
+│   ├── audits/         # CURRENT_SYSTEM_STATE, TEST_EVIDENCE_LOG
+│   ├── ai/             # AI_CONTEXT_INDEX (canonical doc map)
+│   ├── evidence/       # pipeline + frontend runtime evidence
+│   ├── security/       # SECURITY_REVIEW
+│   ├── ops/            # PROD_READINESS, ROLLBACK, MONITORING
+│   └── KNOWN_ISSUES.md # Active blockers register
+└── docker-compose.yml  # 3 services: postgres, app, frontend
 ```
 
 ---
@@ -207,7 +220,7 @@ Results are tracked and published transparently, including weeks where Sen2Nal u
 |-------|------------|---------|
 | Language | Python 3.11 | Core development |
 | API | FastAPI | REST API with auto-docs |
-| Dashboard | Streamlit | Interactive UI |
+| Frontend | React 18 + Vite + TypeScript + Tailwind | NightOps Terminal UI |
 | NLP | FinBERT | Financial sentiment |
 | ML | XGBoost | Directional prediction |
 | Explainability | SHAP | Feature importance |

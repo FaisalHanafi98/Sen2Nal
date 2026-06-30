@@ -69,6 +69,9 @@ coverage.xml
 .dmypy.json
 dmypy.json
 
+# Ruff
+.ruff_cache/
+
 # Alembic
 # Keep migrations/ but ignore temporary files
 alembic.ini.bak
@@ -111,3 +114,6 @@ docs/.doctrees/
 playwright/.auth/
 test-results/
 playwright-report/
+
+# Claude Code (agent tooling, worktrees, local settings)
+.claude/

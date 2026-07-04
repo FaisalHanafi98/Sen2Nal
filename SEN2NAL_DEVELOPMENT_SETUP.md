@@ -39,6 +39,46 @@
 
 ## 2. Environment Setup
 
+### 2.0 Verified Local Path — Poetry, No Docker (2026-07-04)
+
+> **This is the current canonical setup**, verified on Windows 11 with Poetry 2.4.
+> Use it when Docker is unavailable: tests that need PostgreSQL skip automatically
+> and run in CI instead (`.github/workflows/ci.yml` provisions postgres:15).
+> The venv/`requirements.txt` instructions below are stale — there is no
+> `requirements.txt` in this repository; dependencies are managed by Poetry.
+
+Requirements: Python **3.11** installed (the host default may be newer — the
+project targets 3.11, same as CI and Docker) and Poetry 2.x
+(`pip install --user poetry` if missing).
+
+```bash
+# 1. Bind the project env to Python 3.11 explicitly
+#    (find your 3.11 path with:  py -0p)
+poetry env use "C:\Users\<you>\AppData\Local\Programs\Python\Python311\python.exe"
+
+# 2. Install all dependencies (main + dev) from the committed poetry.lock
+poetry install --no-interaction
+
+# 3. Run the test suite
+poetry run pytest
+```
+
+Expected results without Docker/PostgreSQL:
+
+- Database-backed tests **skip** with "PostgreSQL test database not available"
+  (session fixture in `tests/conftest.py` probes `localhost:5432`).
+- Pure-logic tests (contracts, validator, calendar math, seed logic,
+  mocked agents) run and must pass locally.
+- The full PostgreSQL-backed suite is enforced by CI on every push/PR.
+- To run the full suite locally later: install PostgreSQL 15 natively or
+  restore Docker, create `sen2nal_test`, and set `DATABASE_URL` accordingly.
+
+Known host pitfalls (see `docs/KNOWN_ISSUES.md`):
+
+- **KI-004**: if the host default Python is not 3.11, always run
+  `poetry env use` with the explicit 3.11 path before `poetry install`.
+- Windows `cp1252` consoles: keep script output ASCII-safe.
+
 ### 2.1 Clone Repository
 
 ```bash

@@ -95,6 +95,7 @@ markers = [
     "browser: marks tests that require browser automation",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
+    "e2e: marks tests as end-to-end pipeline integration tests (requires PostgreSQL)",
 ]
 
 [tool.mypy]

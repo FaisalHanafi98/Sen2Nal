@@ -315,22 +315,24 @@ compliance (`constants.py:246-268`), react-query parallel fetching (`hooks.ts`).
   legacy `[tool.poetry]` table), B3 (gh keyring token invalid; git push works via
   credential manager).
 
-#### E0.M2 — Test Evidence Baseline  ← NEXT MODULE
+#### E0.M2 — Test Evidence Baseline ✅ COMPLETE
 - **Purpose**: create the recreated-from-loss `docs/audits/TEST_EVIDENCE_LOG.md`
   recording pass/fail of the full suite. Resolves KI-001 ("every 'implemented but
   unverified' claim has a register entry until evidence is captured").
-- **Files affected**: new `docs/audits/TEST_EVIDENCE_LOG.md` (docs only).
+- **Files affected**: new `docs/audits/TEST_EVIDENCE_LOG.md` (docs only, 436 lines).
 - **Dependencies**: E0.M1. **Risk**: low. **Complexity**: low. **Regression risk**: none.
 - **Docker note**: full PG-backed local run needs PostgreSQL. Options: (a) native
   PostgreSQL 15 install + `sen2nal_test` DB; (b) **recommended**: capture the CI run from
   PR #1 (CI provisions postgres:15 and runs ruff+mypy+pytest+coverage) as the PG-backed
   evidence, plus the local 124/42 record.
-- **Acceptance**: every test's status is on record with date, commit, environment, and
-  command; any failures become discovery-log entries, NOT fixes.
+- **Acceptance (MET)**: every test's status is on record with date, commit, environment,
+  and command. CI: 166 passed, 0 failed, 0 skipped, 61.34% coverage. Local: 124 passed,
+  42 skipped, 0 failed. All 166 per-test results recorded. KI-001 resolved.
 - **Testing**: none new (this module IS the test record).
 - **Perf/maint gain**: n/a / restores the evidence policy the KI register depends on.
+- **Status**: PR #2 MERGED (squash `49a0d4e` to main, 2026-07-04, CI green).
 
-#### E0.M3 — E2E Pipeline Harness
+#### E0.M3 — E2E Pipeline Harness  ← NEXT MODULE
 - **Purpose**: a pytest-marked integration test running `run_full_pipeline` on one ticker
   with ALL five external sources mocked (yfinance, NewsAPI, Reddit/PRAW, CNN F&G, LLM
   APIs). Addresses KI-009 (no E2E run ever captured) and KI-014 (keys are placeholders —
@@ -1033,16 +1035,16 @@ From the feasibility study (its full analysis lives with the owner; operative su
 
 ---
 
-## 21. CURRENT EXECUTION STATUS (updated 2026-07-04)
+## 21. CURRENT EXECUTION STATUS (updated 2026-07-04, post E0.M2 merge)
 
-- **Done**: E0.M1 (original commit `3d2ae7f`, PR #1 MERGED to main as squash `6efc43d`,
-  CI green). Local baseline: 124 passed / 42 skipped / 0 failed. Poetry env
-  `sen2nal-dawZnZaD-py3.11` (Python 3.11.9).
-- **Process docs committed**: `CURRENT_MODULE_STATE.md`,
-  `docs/handover/HANDOVER_2026-07-04.md`, `docs/COMMIT_MESSAGE_SOP.md`, and this file
-  committed to main at `c1f36ac` (handover docs + SOP) and this commit (plan).
-  B1 and B7 resolved.
-- **Next**: **E0.M2** — Test Evidence Baseline (needs explicit owner authorisation to start).
+- **Done**: E0.M1 (PR #1 merged `6efc43d`, CI green) + E0.M2 (PR #2 merged `49a0d4e`,
+  CI green). Local baseline: 124 passed / 42 skipped / 0 failed. CI baseline: 166 passed /
+  0 failed / 0 skipped, 61.34% coverage. Poetry env `sen2nal-dawZnZaD-py3.11` (Python 3.11.9).
+- **Process docs committed**: `CURRENT_MODULE_STATE.md`, `docs/handover/*`,
+  `docs/COMMIT_MESSAGE_SOP.md`, `docs/plans/EXECUTION_PLAN_v1.md` on main. B1, B7 resolved.
+- **Evidence log**: `docs/audits/TEST_EVIDENCE_LOG.md` created (E0.M2). KI-001 resolved.
+- **Wave 0 progress**: 2 of 3 modules complete (E0.M1, E0.M2 done; E0.M3 remaining).
+- **Next**: **E0.M3** — E2E Pipeline Harness (needs explicit owner authorisation to start).
 - **Update protocol for this document**: append status changes to §21 and tick modules in
   §9 at every module merge; structural changes to the plan itself require owner approval
   and a version bump.

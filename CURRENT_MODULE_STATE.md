@@ -1,7 +1,7 @@
 # CURRENT_MODULE_STATE.md
 
 > Living engineering state file. Update at every module boundary.
-> Last updated: 2026-07-04 (E0.M1 merged)
+> Last updated: 2026-07-04 (E0.M2 merged)
 
 ---
 
@@ -15,51 +15,60 @@ Current Epic:
 E0 — Verification Baseline
 
 Current Module:
-E0.M1 — Restore Execution Environment
+E0.M2 — Test Evidence Baseline (COMPLETE; next is E0.M3)
 
 Status:
-MERGED. PR #1 squash-merged to main (6efc43d, 2026-07-04). CI green (lint-and-test pass).
+E0.M2 MERGED. PR #2 squash-merged to main (49a0d4e, 2026-07-04). CI green (lint-and-test pass 2m32s).
 
-Module completion: 100%
-Wave 0 completion: 33% (1 of 3 modules: E0.M1 done; E0.M2, E0.M3 remaining)
-Overall programme: ~3% (1 of 37 modules)
+Module completion: 100% (E0.M2)
+Wave 0 completion: 67% (2 of 3 modules: E0.M1, E0.M2 done; E0.M3 remaining)
+Overall programme: ~5% (2 of 37 modules)
 
 ---
 
-Completed (E0.M1):
+Completed (E0.M1 — Restore Execution Environment):
 - Poetry virtualenv created and bound to Python 3.11.9 (host default is 3.14.6 — KI-004).
 - Full dependency set installed from committed poetry.lock (torch, transformers 4.57.3,
   xgboost 2.1.4, fastapi, sqlalchemy, etc.).
 - SEN2NAL_DEVELOPMENT_SETUP.md §2.0 added: verified no-Docker local setup path.
 - Local test run captured: 124 passed, 42 skipped, 0 failed (54.9s).
-- Committed (3d2ae7f), pushed, PR #1 created, squash-merged to main (6efc43d).
+- PR #1 squash-merged to main (6efc43d). CI green.
+
+Completed (E0.M2 — Test Evidence Baseline):
+- docs/audits/TEST_EVIDENCE_LOG.md created: records pass/fail of all 166 tests.
+- CI evidence (PG-backed): 166 passed, 0 failed, 0 skipped, 61.34% coverage, 8.17s.
+  ruff check passed, mypy "Success: no issues found in 35 source files".
+  GitHub Actions run 28694643277, PostgreSQL 15-alpine, Python 3.11.15.
+- Local evidence (no-DB): 124 passed, 42 skipped, 0 failed, 54.9s.
+- All 166 per-test results recorded with file, class, method, and PASSED status.
+- KI-001 RESOLVED.
+- PR #2 squash-merged to main (49a0d4e). CI green.
 
 Remaining (this module):
 - NONE. Module fully closed.
 
 Blocked:
-- Nothing blocks E0.M1.
-- E0.M3 (later) is blocked by the Docker constraint for the *full* PostgreSQL path;
-  runs via mocked externals + CI Postgres instead.
+- E0.M3 (next) is partially blocked by the Docker constraint for the full PostgreSQL
+  path; runs via mocked externals + CI Postgres instead.
 
 Regression Risk:
-None. Docs-only diff (+40 lines, 0 deletions). No source/config/schema touched.
+None. E0.M2 was docs-only (1 file, 436 insertions, 0 deletions). No source/config/schema touched.
 
 Next Action:
-Await owner authorisation for E0.M2 — Test Evidence Baseline (the next module in
-Wave 0). Branch convention: conventional branch from main (e.g. docs/e0m2-test-evidence).
-Commit message SOP: docs/COMMIT_MESSAGE_SOP.md. Full execution plan:
-docs/plans/EXECUTION_PLAN_v1.md (37 modules, 10 epics, 5 waves).
+Await owner authorisation for E0.M3 — E2E Pipeline Harness (the next and final module
+in Wave 0). Spec: docs/plans/EXECUTION_PLAN_v1.md §9, Epic E0. Branch convention:
+conventional branch from main. Commit message SOP: docs/COMMIT_MESSAGE_SOP.md.
+Full execution plan: docs/plans/EXECUTION_PLAN_v1.md (37 modules, 10 epics, 5 waves).
 
 Quality Gate:
-PASSED for E0.M1 —
+PASSED for E0.M2 —
   [x] ruff/format: n/a (docs only)
   [x] mypy: n/a (docs only)
-  [x] build: poetry install exit 0
-  [x] tests: 124 passed / 42 skipped / 0 failed locally; CI runs PG-backed remainder on PR
-  [x] docs: SEN2NAL_DEVELOPMENT_SETUP.md updated in same commit
-  [x] scope: one module, one commit, one PR
-  [x] owner approval / merge: DONE (PR #1 merged 2026-07-04, CI green)
+  [x] build: verified in E0.M1 (poetry install exit 0)
+  [x] tests: n/a (this module IS the test record; CI ran full suite green on PR #2)
+  [x] docs: docs/audits/TEST_EVIDENCE_LOG.md created in same commit
+  [x] scope: one file, one commit, one PR
+  [x] owner approval / merge: DONE (PR #2 merged 2026-07-04, CI green)
 
 ---
 

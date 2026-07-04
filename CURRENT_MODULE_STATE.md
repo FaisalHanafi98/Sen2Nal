@@ -48,7 +48,8 @@ None. Docs-only diff (+40 lines, 0 deletions). No source/config/schema touched.
 Next Action:
 Await owner authorisation for E0.M2 — Test Evidence Baseline (the next module in
 Wave 0). Branch convention: conventional branch from main (e.g. docs/e0m2-test-evidence).
-Commit message SOP now in docs/COMMIT_MESSAGE_SOP.md.
+Commit message SOP: docs/COMMIT_MESSAGE_SOP.md. Full execution plan:
+docs/plans/EXECUTION_PLAN_v1.md (37 modules, 10 epics, 5 waves).
 
 Quality Gate:
 PASSED for E0.M1 —

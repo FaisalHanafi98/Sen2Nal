@@ -1,0 +1,3 @@
+#!/bin/sh
+# GENERATED from core@3b953ef - edit in core/hooks, then: ai sync
+python ".hooks/secret_scan.py" --staged || exit 1

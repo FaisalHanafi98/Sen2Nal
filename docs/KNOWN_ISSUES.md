@@ -99,10 +99,10 @@
 - **Owner**: ML.
 
 ### KI-013 (P2) — Modules without dedicated unit tests
-- **Symptom**: No `tests/test_features.py`, no `tests/test_prediction.py`, no `tests/test_experiment.py`, no `tests/test_alerts_router.py`.
+- **Symptom**: No `tests/test_features.py`, no `tests/test_prediction.py`, no `tests/test_experiment.py`.
 - **Evidence**: `ls tests/`.
 - **Impact**: ML feature math + walk-forward predictions are silent-failure prone.
-- **Fix**: Add skeletons during Phase 3.
+- **Fix**: **Resolved** — unit test suites created in `tests/test_features.py`, `tests/test_prediction.py`, and `tests/test_experiment.py`.
 - **Owner**: QA.
 
 ### KI-014 (P2) — External data source keys unknown / placeholder
@@ -132,4 +132,4 @@
 
 ## Closed (this sprint)
 
-_(populate as items resolve; reference commit SHA)_
+- **KI-013**: Unit tests added for FeatureAgent, PredictionAgent, and ExperimentAgent (`tests/test_features.py`, `tests/test_prediction.py`, `tests/test_experiment.py`). Ref: commits `240d518`, `ef51feb`.

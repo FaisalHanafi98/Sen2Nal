@@ -26,6 +26,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@localhost:5432/sen2nal_test
+      SEN2NAL_TEST_DATABASE_URL: postgresql://sen2nal_user:sen2nal_password@localhost:5432/sen2nal_test
       ENVIRONMENT: testing
       PYTHONDONTWRITEBYTECODE: 1
 

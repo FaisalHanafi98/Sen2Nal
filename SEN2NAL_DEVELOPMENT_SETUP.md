@@ -65,13 +65,19 @@ poetry run pytest
 
 Expected results without Docker/PostgreSQL:
 
-- Database-backed tests **skip** with "PostgreSQL test database not available"
-  (session fixture in `tests/conftest.py` probes `localhost:5432`).
+- Database-backed tests **skip** when `SEN2NAL_TEST_DATABASE_URL` is unset.
+  The application `DATABASE_URL` is never permission to modify a test database.
 - Pure-logic tests (contracts, validator, calendar math, seed logic,
   mocked agents) run and must pass locally.
-- The full PostgreSQL-backed suite is enforced by CI on every push/PR.
-- To run the full suite locally later: install PostgreSQL 15 natively or
-  restore Docker, create `sen2nal_test`, and set `DATABASE_URL` accordingly.
+- CI configures its separate ephemeral PostgreSQL service for these tests;
+  the authored workflow is not evidence that a CI run has passed.
+- For a later authorised local full-suite run, first provision and verify a
+  disposable local PostgreSQL database ending in `_test`, then explicitly set
+  `SEN2NAL_TEST_DATABASE_URL`. The fixture creates a unique `sen2nal_test_<uuid>`
+  schema and removes only that owned schema; it does not drop application tables.
+  An invalid/non-local URL is refused, and an explicitly configured unreachable
+  database fails setup rather than silently becoming a passing integration gate.
+  Docker remains off-limits locally. No database provisioning is part of this edit.
 
 Known host pitfalls (see `docs/KNOWN_ISSUES.md`):
 

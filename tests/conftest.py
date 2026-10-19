@@ -1,37 +1,59 @@
 """Pytest configuration and fixtures for Sen2Nal tests."""
 
 import os
+import uuid
 from datetime import date
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import CreateSchema, DropSchema
 from fastapi.testclient import TestClient
 
 from src.database.connection import Base, get_db
 from src.database.models import DimCalendar, DimStock
 from src.api.main import app
 
-TEST_DB_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://sen2nal_user:sen2nal_password@localhost:5432/sen2nal_test",
-)
-
-
 @pytest.fixture(scope="session")
 def test_db_engine():
-    """PostgreSQL engine for tests — matches production behavior."""
-    engine = create_engine(TEST_DB_URL, echo=False)
+    """Use only an explicit local test DB and a unique fixture-owned schema."""
+    explicit_url = os.environ.get("SEN2NAL_TEST_DATABASE_URL")
+    if not explicit_url:
+        pytest.skip("SEN2NAL_TEST_DATABASE_URL unset; PostgreSQL integration unverified")
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-    except Exception:
-        pytest.skip("PostgreSQL test database not available")
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    yield engine
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
+        url = make_url(explicit_url)
+        if (url.drivername not in {"postgresql", "postgresql+psycopg2"}
+                or url.host not in {"localhost", "127.0.0.1", "::1"}
+                or not (url.database or "").endswith("_test") or url.query):
+            raise ValueError
+    except (ArgumentError, ValueError):
+        raise ValueError("Provide an explicit local PostgreSQL test URL ending in '_test'") from None
+
+    with pytest.MonkeyPatch.context() as routing:
+        for key in list(os.environ):
+            if key.upper().startswith("PG"):
+                routing.delenv(key, raising=False)
+        schema = f"sen2nal_test_{uuid.uuid4().hex}"
+        engine = create_engine(url, echo=False, connect_args={
+            "options": f"-csearch_path={schema}",
+            "hostaddr": "::1" if url.host == "::1" else "127.0.0.1",
+        })
+        created = False
+        try:
+            with engine.begin() as conn:
+                conn.execute(CreateSchema(schema))
+            created = True
+            Base.metadata.create_all(bind=engine)
+            yield engine
+        finally:
+            try:
+                if created:
+                    with engine.begin() as conn:
+                        conn.execute(DropSchema(schema, cascade=True))
+            finally:
+                engine.dispose()
 
 
 @pytest.fixture(scope="function")

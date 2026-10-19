@@ -2,7 +2,6 @@
 
 from datetime import date
 from unittest.mock import MagicMock
-import pytest
 from src.agents.features import FeatureAgent, _classify_signal
 from src.constants import SIGNAL_THRESHOLDS, SignalType
 

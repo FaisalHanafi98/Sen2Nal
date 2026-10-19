@@ -2,7 +2,6 @@
 
 from datetime import date
 from unittest.mock import MagicMock
-import pytest
 from src.agents.prediction import FEATURE_COLS, PredictionAgent
 
 

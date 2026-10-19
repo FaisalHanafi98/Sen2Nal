@@ -3,7 +3,6 @@
 from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
-import pytest
 from src.agents.experiment import ExperimentAgent, _calc_return
 
 

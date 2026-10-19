@@ -1,0 +1,111 @@
+# CURRENT_MODULE_STATE
+
+Updated: 20 October 2026. This is the current release and execution entry point.
+Earlier checkpoint text is preserved in Git/history and the workspace recovery packet.
+
+## Owner-defined release contract
+
+| Area | Current decision |
+|---|---|
+| Purpose | Personal supplementary market research, not a primary investment reference |
+| Market | US stocks only; Bursa expansion is outside this release |
+| Initial universe | 50 largest US companies by market capitalisation, one ticker per company; implementation pending |
+| Cadence | Daily; supersedes the earlier weekly-direction answer |
+| Publication | 08:00 America/New_York, on the appropriate US trading schedule |
+| Malaysia clock | 20:00 during US daylight time, 21:00 during US standard time |
+| Inputs | Ticker-specific news/forum NLP sentiment, supported by roughly one year of historical performance |
+| Output | Explainable Buy/Sell research tags, sources, timestamps, uncertainty and prominent risk wording |
+| Exclusions | No stock-price targets, order execution, guaranteed performance or personalised portfolio instruction |
+
+Use exchange time rather than a fixed Malaysia offset. The owner wants publication
+after returning from work. NYSE regular trading starts at 09:30 Eastern; the timing
+and DST references are [NYSE](https://www.nyse.com/trade/trading-information) and
+[NIST](https://www.nist.gov/pml/time-and-frequency-division/local-time-faqs).
+
+The owner has explicitly deferred evaluation design until the shared improvements
+are finished. Do not reopen that decision or start label/evaluation changes now.
+The following details belong to that later work:
+
+- The dated market-cap source, rebalance cadence and representative share class;
+  the selection rule itself is settled. Backtests need point-in-time
+  membership or an explicit survivorship limitation, not today's leaders assumed historical.
+- Which information is excluded by the owner's same-day pre-market evaluation
+  instruction. Distinguish news inputs available before 08:00, regular-session price
+  history, the evaluation entry baseline and outcomes observed after publication.
+- How sentiment and the one-year history combine into a tag; define evidence
+  thresholds and neutral/insufficient/stale-source behaviour rather than force confidence.
+- The outcome horizon, benchmark, costs and scoring appropriate to daily research.
+  A classification target is not the same as forecasting a numeric stock price.
+
+## Current implementation versus intent
+
+Current code still defaults to 10 tickers and its previous signal categories.
+The daily 50-stock release, new publication schedule and revised tagging/evaluation
+contract are **not implemented**. Do not claim them as working from this document.
+
+Prediction code currently overlaps a same-row daily-return feature and target and
+does not establish the required as-of boundary. Stage names do not prove record
+validation; only Calendar currently overrides extraction for its Pydantic contract.
+Those are investigation/remediation items under SN01, not a verified daily signal.
+
+Keep legitimate existing decisions: React frontend; PostgreSQL-only integration;
+ADR-005's 252/21 trading-date intent (actual current row slicing needs repair);
+feature_contributions naming; metrics in pipeline_runs.result_json; no local Docker.
+The owner's roughly one-year support/history requirement does not silently set a
+252-session total-retention cap. A 252-date training window plus a 21-date holdout,
+feature warm-up and label maturity needs more history. Establish minimum data and
+an insufficient-history outcome during the deferred evaluation design.
+No public hosting, scheduler, external API/model call or deployment is authorised
+merely by this release contract.
+
+## Verified local changes
+
+| Change | Evidence |
+|---|---|
+| Staged-blob Git scanner | b934d84; owned source refresh, existing registration preserved |
+| Frontend security patch | 79741c4; Vite 7.3.7 pinned, baseline/updated builds passed |
+| Test lint hygiene | 7b7711c; three unused imports removed separately |
+| Test database isolation | f6a4b34; explicit local test URL, unique owned schema, no application-table reset |
+| Backend local tests | 152 passed, 42 PostgreSQL-dependent skips, 59.69% coverage; 40% floor retained |
+| Safety regressions | 12 mocked cases pass; original destructive fixture and routing bypasses reproduced red/green |
+| Frontend checks | Build and loopback HTML/client/TSX/CSS/synthetic-proxy passed; lint: zero errors / one hook warning |
+| Native host | Actual Codex/Claude lifecycle event enforcement remains unverified |
+
+Python 3.11.9 tests used explicit synthetic configuration with downloads/external
+keys disabled. Existing environments were reused; no ML stack was reinstalled.
+Full ruff passes. The broad mypy command stalled and exceeded a bounded retry;
+type verification remains **unverified**, not green. No real PostgreSQL connection
+or schema change was performed. Mocks do not establish real search-path isolation,
+database identity, pool behaviour or unrelated-sentinel preservation.
+
+Working branch remains chore/e0m1-environment-baseline with new local commits;
+existing PR/remote status was not refreshed or changed. No push or merge occurred.
+Unrelated prior documentation/UI work remains uncommitted and preserved.
+
+## Risk communication and release gates
+
+Keep the existing **NOT FINANCIAL ADVICE** requirement and make the research-only
+purpose, possible stale/incorrect/incomplete AI output, independent verification,
+risk of loss and the user's responsibility for decisions prominent. Explain the
+method, publication cutoff, data/model limitations and dated evaluation honestly.
+
+Draft wording for later UI review:
+
+> Experimental research only — NOT FINANCIAL ADVICE. Buy/Sell tags summarise this
+> project's method and may be wrong, incomplete or stale. Use independent sources;
+> do not rely on this site as your primary investment reference. Trading can cause
+> losses. You are responsible for your decisions. Past performance does not
+> guarantee future results.
+
+Do not claim blanket legal immunity or licence exemption from a disclaimer.
+The SC's [investment-advice guidance, paragraph 2.2](https://www.sc.com.my/api/documentms/download.ashx?id=d22c8909-06e8-40bf-a8da-4fc31b4606c0)
+says disclaimer text alone does not settle licensing; activity and circumstances
+matter. US-law applicability and the effect of any terms remain unresolved.
+The older SEC 2011 overview explicitly warns it may be out of date, so it is not
+used as current clearance. This document is not a legal determination.
+
+Before a public release: settle the contract above, prove time-correct evaluation
+and stage/data gates, verify model/data rights and free quotas, establish isolated
+PostgreSQL evidence, resolve type checking and security/recovery/hosting gates.
+The full reel programme status remains in the
+[workspace master plan](../../workspace/reels-improvement-2026-10-19/REELS_IMPROVEMENT_PLAN.md).

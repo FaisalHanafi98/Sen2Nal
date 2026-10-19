@@ -1,5 +1,13 @@
 Six-agent sequential ML pipeline: FinBERT sentiment (VADER fallback) + calendar
-seasonality → XGBoost trading signals. Bursa Malaysia stocks + S&P 500 top 10.
+seasonality → XGBoost trading signals in the current implementation.
+The owner-defined release is daily US-only sentiment-led research tags, initially
+the 50 largest US companies by market capitalisation, one ticker per company,
+published at 08:00 America/New_York and supported by roughly one year
+of history. This supersedes the earlier weekly decision. It is a supplementary
+personal research project, with no stock-price targets or trade execution.
+Read CURRENT_MODULE_STATE.md for intended versus implemented behaviour and open
+implementation gaps. Evaluation design is deferred while shared improvements are
+completed; do not claim the 50-stock release is complete.
 Philosophy: "signal over certainty" — surface measurable patterns, decompose
 every score transparently. Every prediction output carries **NOT FINANCIAL
 ADVICE**.
@@ -8,9 +16,11 @@ ADVICE**.
 
 AG-01 ingestion → AG-02 sentiment → AG-03 calendar → AG-04 features →
 AG-05 prediction → AG-06 experiment (weekly LLM comparison; non-critical).
-Stages 1–5 are critical: any failure halts the pipeline. All critical agents
-enforce Pydantic contracts via `_validate_output()`; violations raise
-`DataContractViolation`.
+Stages 1–5 are intended to be critical. The current runner halts on an explicit
+failed status; broader malformed/partial-status handling still needs proof.
+All five declare stage names, but currently only Calendar overrides record
+extraction for Pydantic validation. A stage name alone is not contract enforcement.
+`DataContractViolation` is available; completing the other boundaries is pending.
 
 ### Decided — do not re-ask
 
@@ -18,24 +28,30 @@ enforce Pydantic contracts via `_validate_output()`; violations raise
 - Walk-forward validation strictly (ADR-005): 252-day train, 21-day test.
 - Tests run against PostgreSQL only; SQLite divergence unacceptable.
 - Model persistence: joblib to Docker volume for MVP; S3 later.
-- Ticker universe: 10 MVP tickers in `ALLOWED_TICKERS` (src/constants.py).
-- Holidays: both NYSE and Bursa, 2024–2027.
+- Current code has 10 MVP tickers in `ALLOWED_TICKERS` (src/constants.py); the
+  chosen market-cap universe is not yet implemented. Dated membership, rebalancing
+  and share-class choice still need implementation rules before evaluation.
+- Existing calendars contain NYSE and Bursa records; new release scope is US-only.
+- Docker is off-limits locally. Do not run Docker/Compose commands or edit its files.
 
 ### Commands
 
-`poetry install` · `uvicorn src.api.main:app --reload --port 8000` ·
-`docker-compose up -d postgres` then `pytest tests/ -v --cov=src
---cov-fail-under=40` · `poetry run python scripts/seed_calendar.py` ·
-`poetry run python -m src.pipeline.runner`
+Use the verified Python 3.11 environment and project setup guide. Local tests
+need synthetic configuration; PostgreSQL integration requires the separate
+`SEN2NAL_TEST_DATABASE_URL` and an authorised disposable local database.
+The app's `DATABASE_URL` never grants test reset permission. No seed, pipeline,
+scheduler, model download or exposed API launch follows from reading this guide.
 
 ### Gates and security
 
-Coverage ≥40% (Wave 1; 80% end target) · mypy and ruff clean · contracts
-enforced at every stage boundary. `POST /pipeline/run` requires `X-Api-Key`
+Required gates: coverage ≥40% (Wave 1; 80% end target), mypy and ruff, and verified
+contracts at stage boundaries. These are requirements, not a claim all pass.
+`POST /pipeline/run` requires `X-Api-Key`
 when `PIPELINE_API_KEY` is set; ticker whitelist enforced at the API; never
 return synthetic data from API responses.
 
 ### External data limits
 
-NewsAPI 100/day · Reddit 100/min · yfinance fair use · CNN Fear & Greed hourly.
-ADRs live in `docs/adr/`.
+Verify current provider quotas, rights and exact model-artifact licence before
+calls or redistribution. Existing configuration values are not free usage grants.
+No paid external calls or private-data uploads. ADRs live in `docs/adr/`.

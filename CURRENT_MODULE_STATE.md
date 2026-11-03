@@ -1,7 +1,28 @@
 # CURRENT_MODULE_STATE
 
-Updated: 20 October 2026. This is the current release and execution entry point.
+Updated: 4 November 2026. This is the current release and execution entry point.
 Earlier checkpoint text is preserved in Git/history and the workspace recovery packet.
+
+## Latest work order: SN-BASE (4 November 2026)
+
+The owner selected **SN-BASE only**. The baseline covers checkout/runtime identity,
+safe test execution and existing verification/reuse evidence; application behaviour
+is unchanged. See the [dated evidence log](docs/audits/TEST_EVIDENCE_LOG.md) for
+commands, environment, exclusions, plan mapping and remaining gates.
+
+At source revision `e6ee318`, fresh offline checks produced **146 passed,
+42 PostgreSQL skips, 6 download-calling tests deselected, 59.20% coverage**.
+The separate mocked database-safety run passed all 12 cases. Ruff and frontend
+build passed; frontend lint reported zero errors and one existing hook warning.
+Mypy exceeded its 90-second limit and remains unverified. These checks do not
+establish real PostgreSQL isolation, a complete pipeline journey or release readiness.
+
+The existing Python 3.11.9 Poetry environment was reused through a process-local
+`VIRTUAL_ENV`; unqualified Poetry currently selects host Python 3.14.6 instead.
+No environment was installed/rebound. Existing E0.M2 evidence and an E0.M3 harness
+were found on other local branches and require reconciliation before reuse.
+SN01-A is the next proposed contract slice; it has not been started. Evaluation
+remains deferred, and the US-only/top-50/08:00 New York contract below is retained.
 
 ## Owner-defined release contract
 
@@ -58,7 +79,7 @@ an insufficient-history outcome during the deferred evaluation design.
 No public hosting, scheduler, external API/model call or deployment is authorised
 merely by this release contract.
 
-## Verified local changes
+## Earlier verified local changes (20 October 2026)
 
 | Change | Evidence |
 |---|---|

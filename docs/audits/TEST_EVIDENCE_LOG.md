@@ -187,3 +187,37 @@ US-only owner scope and preservation of the legacy helper API. No frontend files
 changed, so the earlier frontend checks were not repeated. PostgreSQL and full
 type checks remain unverified. The next SN01-A slice is the pure cutoff/manifest
 contract; no scheduler, external source or evaluation change accompanies this fix.
+
+## SN01-A.2 — Cutoff and source-version selection (4 November 2026)
+
+Starting revision: `455470f`. `src/contracts/publication.py` adds frozen strict
+evidence references and pure inclusive 08:00 New York selection. Source times are
+aware UTC instants, with unknown timestamps retained as unknown. Selection is
+deterministic across input order/retries, preserves first receipt, uses only the
+latest eligible revision and refuses conflicting/ambiguous versions. Explicit
+expiry marks a latest revision stale without resurrecting older content. Missing
+expiry is unassessed freshness, not a freshness or publication certificate.
+No licensed source text is copied into these references. ADR-004's dated amendment
+reconciles the owner cutoff and records that the legacy scheduler is not integrated.
+
+Red/green progression observed: the unimplemented cutoff failed both DST cases;
+a late revision was initially selected incorrectly; eligible retries/revisions
+were initially order-dependent; expiry/conflict/ambiguity controls initially failed;
+timestamp order and an empty naive-cutoff request were initially accepted.
+Each group passed after its corresponding implementation. The completed suite
+also asserts unknown times, naive source times, exact cutoff/microsecond boundaries,
+UTC normalisation, first receipt and frozen records. Inputs are synthetic.
+
+| Check | Fresh result |
+|---|---|
+| Offline regression command above, plus `-q` | 164 passed, 42 skipped, 6 deselected in 3.42s; 60.71% coverage; 40% floor retained; zero blocked connection attempts |
+| Publication subset within that run | 18 passed; 71/71 module statements covered |
+| `poetry run ruff check src/ tests/` | Exit 0 |
+| `poetry run python -m mypy src/contracts/publication.py --follow-imports=skip --ignore-missing-imports` | Exit 0; one file; imported modules deliberately skipped |
+
+Self-review covered cutoff inclusivity, DST, chronology, identity conflicts,
+deterministic ordering, source-only references and immutable nested values.
+The selector is not wired to persistence/API/scheduling and does not certify
+freshness, rights or signal quality. Full mypy, PostgreSQL, real calendar/universe
+and publication journey checks remain open. The next independent package is a
+hashable manifest with explicit withheld/no-data reasons; evaluation stays deferred.

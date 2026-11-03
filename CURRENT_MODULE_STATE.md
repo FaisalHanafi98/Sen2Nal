@@ -12,14 +12,21 @@ the regression was observed red at -0.3 versus -0.0055, then green; all 24 calen
 tests pass. The offline regression subset is 146 passed, 42 PostgreSQL skips,
 6 download-calling tests deselected, 59.18% coverage. Ruff and a focused one-file
 mypy check with skipped imports pass; full type verification remains open.
-The next slice implements pure publication/evidence contracts: 08:00 America/New_York cutoff,
-known-before-cutoff versions, immutable deterministic manifests and explicit
-missing-calendar/universe/evidence states. Tests use synthetic supplied exchange
-sessions and provenance; they do not certify a live calendar or market-cap source.
-Trace: calendar agent and new publication contract → pure regression assertions.
-Acceptance includes delayed/revised/missing-time inputs, duplicate/conflicting
-versions, DST, closed sessions and frozen output. No evaluation labels, provider
-calls, database changes, service launches or scheduler activation are included.
+The second completed slice adds `src/contracts/publication.py`: an 08:00
+America/New_York cutoff and frozen source-version inputs with deterministic
+as-of selection. Unknown times and late receipts are excluded; conflicts and
+ambiguous revisions fail closed. Explicitly expired revisions are stale, without
+inventing a universal freshness window. All 18 new assertions pass; the offline
+suite has 164 passes, 42 PostgreSQL skips, 6 download-calling tests deselected and
+60.71% coverage. Ruff and the focused publication-module type check pass.
+The pure selector does not publish results, enforce provider rights or establish
+freshness where no expiry policy is supplied. ADR-004 now distinguishes the
+owner's cutoff from its superseded after-close schedule.
+The next slice is a hashable evidence manifest with explicit missing-calendar,
+universe and evidence states. It will use supplied synthetic session/provenance
+fixtures, without certifying a live calendar or market-cap source. No evaluation
+labels, provider calls, database changes, service launches or scheduler activation
+are included. Full type and PostgreSQL integration gates remain open.
 Revert only the relevant slice's atomic commit to recover; preserve existing local work.
 
 ## Completed baseline: SN-BASE (4 November 2026)

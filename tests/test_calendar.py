@@ -214,10 +214,15 @@ class TestMalaysianHolidays:
         assert date(2030, 8, 31) in holidays  # Merdeka Day
         assert date(2030, 9, 16) in holidays  # Malaysia Day
 
-    def test_holiday_decay_includes_malaysian_holidays(self, agent):
-        """Holiday decay near Hari Raya should be stronger than a random date."""
-        # 2026-03-20 is Hari Raya Aidilfitri — should have strong decay
-        near_hari_raya = agent._holiday_decay(date(2026, 3, 19))
-        # 2026-08-15 is far from any holiday
-        far_date = agent._holiday_decay(date(2026, 8, 15))
-        assert abs(near_hari_raya) > abs(far_date)
+    def test_us_signal_does_not_consult_bursa_holidays(self, agent, monkeypatch):
+        """A Bursa-only closure must not change a US research signal."""
+        monkeypatch.setattr(
+            "src.agents.calendar.us_market_holidays",
+            lambda year: [date(year, 9, 7)],
+        )
+        monkeypatch.setattr(
+            "src.agents.calendar.malaysian_market_holidays",
+            lambda year: [date(year, 8, 31)],
+        )
+        # With the supplied US calendar the nearest holiday is seven days away.
+        assert agent._holiday_decay(date(2026, 8, 31)) == -0.0055

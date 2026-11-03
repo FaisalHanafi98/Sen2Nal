@@ -3,7 +3,26 @@
 Updated: 4 November 2026. This is the current release and execution entry point.
 Earlier checkpoint text is preserved in Git/history and the workspace recovery packet.
 
-## Latest work order: SN-BASE (4 November 2026)
+## Active continuation: SN01-A (4 November 2026)
+
+The owner authorised continued implementation after SN-BASE. Starting revision:
+`1072094`; the original 30 dirty/untracked paths remain outside this work.
+The first completed slice removes Bursa holidays from US calendar signals:
+the regression was observed red at -0.3 versus -0.0055, then green; all 24 calendar
+tests pass. The offline regression subset is 146 passed, 42 PostgreSQL skips,
+6 download-calling tests deselected, 59.18% coverage. Ruff and a focused one-file
+mypy check with skipped imports pass; full type verification remains open.
+The next slice implements pure publication/evidence contracts: 08:00 America/New_York cutoff,
+known-before-cutoff versions, immutable deterministic manifests and explicit
+missing-calendar/universe/evidence states. Tests use synthetic supplied exchange
+sessions and provenance; they do not certify a live calendar or market-cap source.
+Trace: calendar agent and new publication contract → pure regression assertions.
+Acceptance includes delayed/revised/missing-time inputs, duplicate/conflicting
+versions, DST, closed sessions and frozen output. No evaluation labels, provider
+calls, database changes, service launches or scheduler activation are included.
+Revert only the relevant slice's atomic commit to recover; preserve existing local work.
+
+## Completed baseline: SN-BASE (4 November 2026)
 
 The owner selected **SN-BASE only**. The baseline covers checkout/runtime identity,
 safe test execution and existing verification/reuse evidence; application behaviour
@@ -21,8 +40,8 @@ The existing Python 3.11.9 Poetry environment was reused through a process-local
 `VIRTUAL_ENV`; unqualified Poetry currently selects host Python 3.14.6 instead.
 No environment was installed/rebound. Existing E0.M2 evidence and an E0.M3 harness
 were found on other local branches and require reconciliation before reuse.
-SN01-A is the next proposed contract slice; it has not been started. Evaluation
-remains deferred, and the US-only/top-50/08:00 New York contract below is retained.
+The later continuation starts SN01-A above. Evaluation remains deferred, and the
+US-only/top-50/08:00 New York contract below is retained.
 
 ## Owner-defined release contract
 

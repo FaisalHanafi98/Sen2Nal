@@ -160,3 +160,30 @@ US-only/top-50/08:00 `America/New_York` scope. It requires a separate selection;
 SN01-B evaluation remains deferred. Real PostgreSQL isolation/sentinel evidence,
 Alembic fresh/upgrade paths, full browser/pipeline journeys, the six download-calling
 tests and complete type checking remain unverified unless separately evidenced.
+
+## SN01-A.1 — US-only holiday feature (4 November 2026)
+
+Starting revision: `1072094`. The owner authorised continued implementation and
+explicitly requested atomic local commits, the CREAMS commit SOP lookup and the
+Humanizer guide before finalising messages. CREAMS' current `AGENTS.md` states
+that its message format is the shared workspace SOP; that SOP also covers Sen2Nal.
+No CREAMS application work was performed.
+
+`CalendarAgent._holiday_decay` previously combined US and Bursa holiday lists
+for every ticker. It now uses only the US list, preserving the existing approximate
+feature calculation and the separately available Malaysian calendar helpers.
+This does not make the approximation an authoritative exchange-session calendar.
+
+| Check | Result |
+|---|---|
+| Updated US-only regression before fix | Failed with actual `-0.3`, expected `-0.0055`, under supplied synthetic holiday lists |
+| `offline_pytest.py tests/test_calendar.py --no-cov` | 24 passed in 0.51s, no blocked connection attempts |
+| Offline regression command above, plus `-q` | 146 passed, 42 skipped, 6 deselected in 5.19s; 59.18% coverage; 40% floor retained; no blocked connection attempts |
+| `poetry run ruff check src/ tests/` | Exit 0 |
+| `poetry run python -m mypy src/agents/calendar.py --follow-imports=skip --ignore-missing-imports` | Exit 0; one source file; skipped imports make this narrower than the unresolved full check |
+
+Self-review covered the two-line behavioural change, meaningful red/green test,
+US-only owner scope and preservation of the legacy helper API. No frontend files
+changed, so the earlier frontend checks were not repeated. PostgreSQL and full
+type checks remain unverified. The next SN01-A slice is the pure cutoff/manifest
+contract; no scheduler, external source or evaluation change accompanies this fix.

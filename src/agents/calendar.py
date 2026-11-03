@@ -210,14 +210,13 @@ class CalendarAgent(BaseAgent):
     def _holiday_decay(self, target: date) -> float:
         """Compute holiday decay: e^(-n) where n = trading days to nearest holiday.
 
-        Checks both NYSE and Bursa Malaysia holidays since Sen2Nal covers
-        both S&P 500 and Bursa stocks.
+        Only US holidays contribute to this US-only release. This remains an
+        approximate signal feature, not an authoritative exchange-session gate.
         """
         min_distance = 999
 
         for y in [target.year - 1, target.year, target.year + 1]:
-            all_holidays = us_market_holidays(y) + malaysian_market_holidays(y)
-            for holiday in all_holidays:
+            for holiday in us_market_holidays(y):
                 delta = abs((target - holiday).days)
                 trading_days = max(1, int(delta * 5 / 7))
                 min_distance = min(min_distance, trading_days)

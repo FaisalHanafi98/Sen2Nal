@@ -221,3 +221,46 @@ The selector is not wired to persistence/API/scheduling and does not certify
 freshness, rights or signal quality. Full mypy, PostgreSQL, real calendar/universe
 and publication journey checks remain open. The next independent package is a
 hashable manifest with explicit withheld/no-data reasons; evaluation stays deferred.
+
+## SN01-A.3 / SN-M01.1 — Pure evidence manifest (4 November 2026)
+
+Starting revision: `d07e1e7`. Frozen supplied US-session and universe records now
+form an input manifest with explicit cutoff, timezone, run/method/configuration
+identity and `NOT FINANCIAL ADVICE`. Membership requires 50 distinct US companies,
+tickers and ranks, dated effectiveness and nonblank source/share-class/rebalance
+references. Session intervals are explicit, so closed and half-day fixtures do not
+silently become weekday/default-close assumptions. No actual provider or owner
+policy was selected by these synthetic records.
+
+The availability states are `withheld`, `no_data` and `eligible_inputs`.
+`eligible_inputs` means supplied structural/as-of prerequisites only: it does not
+certify source truth, approved policies, rights, freshness without an expiry,
+run validation or model quality. No tag is published. A manifest rejects ineligible
+evidence rather than allowing constructor calls to bypass source selection.
+Canonical JSON includes frozen original input facts and round-trips through the
+strict model. Its SHA-256 includes run/method/configuration and source identities;
+it is not a cross-run publication uniqueness constraint or a persistence ledger.
+
+Observed red/green cases: missing calendar/universe initially reported eligible;
+closed/mismatched/late calendars and ineffective/late universes initially passed;
+duplicate mappings, malformed intervals and ineligible manifest evidence were
+initially accepted; cutoff was initially absent; blank provenance and a session
+opening at the cutoff were initially accepted. Each group passed after repair.
+Further cases prove exact hash/JSON replay, late-version and retry sentinels,
+member-order canonicalisation, changed-version hash distinction, half-day cutoff,
+frozen nested originals, 49-member refusal and non-US refusal.
+
+| Check | Fresh result |
+|---|---|
+| `offline_pytest.py tests/test_publication.py --no-cov -q` | 44 passed in 0.23s; zero blocked connection attempts |
+| Offline regression command above, plus `-q` | 190 passed, 42 skipped, 6 deselected in 4.02s; 63.00% coverage; 40% floor retained; zero blocked connection attempts |
+| `poetry run ruff check src/ tests/` | Exit 0 |
+| `poetry run python -m mypy src/contracts/publication.py --follow-imports=skip --ignore-missing-imports` | Exit 0; one source file, imports skipped |
+
+Self-review covered strict frozen inputs, date/time boundaries, unique membership,
+source-only references, canonical hashing, constructor bypass and calibrated state
+names. This is SN-M01.1's pure input-manifest foundation, not the journal/replay
+module's persisted publication-to-note journey. Score/model/history bindings,
+source rights, approved actual membership, live session integration, PostgreSQL
+and full mypy remain open. Next: independently repair SN02 run/status boundaries;
+do not use a nonblank synthetic policy reference as owner approval.

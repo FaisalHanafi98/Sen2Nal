@@ -22,11 +22,22 @@ suite has 164 passes, 42 PostgreSQL skips, 6 download-calling tests deselected a
 The pure selector does not publish results, enforce provider rights or establish
 freshness where no expiry policy is supplied. ADR-004 now distinguishes the
 owner's cutoff from its superseded after-close schedule.
-The next slice is a hashable evidence manifest with explicit missing-calendar,
-universe and evidence states. It will use supplied synthetic session/provenance
-fixtures, without certifying a live calendar or market-cap source. No evaluation
-labels, provider calls, database changes, service launches or scheduler activation
-are included. Full type and PostgreSQL integration gates remain open.
+The third completed slice adds a versioned, frozen, hashable input manifest with
+withheld/no-data/eligible-input states. It validates supplied session intervals,
+dated membership with 50 distinct US companies/tickers/ranks, cutoff availability
+and nonblank policy references. Canonical JSON round-trips preserve its SHA-256;
+late versions, retries and member ordering cannot change the selected original.
+The 44 publication tests pass; the offline suite has 190 passes, 42 PostgreSQL
+skips, 6 download-calling tests deselected and 63.00% coverage. Ruff and the focused
+publication-module type check pass. These are synthetic structural/as-of checks,
+not verification of provider truth, policy approval, rights or model quality.
+
+This also completes the pure-manifest portion of SN-M01.1. Persistence, score/model
+and supporting-history bindings, read API/UI, private notes and cadence integration
+remain open. Actual universe policies/source and a verified calendar feed are still
+unresolved; SN01-A is not a completed live release. The next independent repair is
+SN02 run/status integrity. Evaluation remains deferred, and full type/PostgreSQL
+integration gates remain open. No service or scheduler has been activated.
 Revert only the relevant slice's atomic commit to recover; preserve existing local work.
 
 ## Completed baseline: SN-BASE (4 November 2026)

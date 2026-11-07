@@ -11,6 +11,8 @@ Can be triggered via:
 """
 
 import logging
+import math
+from time import perf_counter
 import uuid
 from datetime import date
 from typing import Any, cast
@@ -59,14 +61,45 @@ def run_full_pipeline(
     results: dict[str, Any] = {"run_id": run_id, "target_date": str(target), "stages": {}}
 
     def _run_stage(name: str, agent_cls: type, **kwargs: Any) -> dict[str, Any]:
-        agent = agent_cls(db, run_id)
-        result = agent.run(**kwargs)
+        started = perf_counter()
+        result: dict[str, Any]
+        try:
+            payload = agent_cls(db, run_id).run(**kwargs)
+        except Exception:
+            result = {"status": "failed", "error_code": "stage_exception",
+                      "error": "Stage execution failed"}
+        else:
+            status = payload.get("status") if isinstance(payload, dict) else None
+            if not isinstance(status, str) or status not in {"success", "failed", "invalid", "partial"}:
+                result = {"status": "invalid", "error_code": "invalid_stage_status",
+                          "error": "Stage returned an invalid result envelope"}
+            elif status == "success" and payload.get("error") not in (None, ""):
+                result = {"status": "invalid", "error_code": "stage_error_on_success",
+                          "error": "Stage reported an error alongside success"}
+            else:
+                result = dict(payload)
+        elapsed = result.get("elapsed_seconds", perf_counter() - started)
+        try:
+            valid_elapsed = (isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool)
+                             and math.isfinite(elapsed) and elapsed >= 0)
+        except OverflowError:
+            valid_elapsed = False
+        if not valid_elapsed:
+            result = {"status": "invalid", "error_code": "invalid_stage_elapsed",
+                      "error": "Stage returned an invalid duration",
+                      "elapsed_seconds": perf_counter() - started}
+        else:
+            result["elapsed_seconds"] = float(elapsed)
+        if result["status"] != "success":
+            logger.warning("[%s] Stage %s returned %s", run_id, name, result["status"])
+            db.rollback()
         results["stages"][name] = result
         return cast(dict[str, Any], result)
 
     def _halt(failed_stage: str) -> dict[str, Any]:
         results["overall_status"] = "failed"
         results["failed_at"] = failed_stage
+        results["failure_kind"] = results["stages"][failed_stage]["status"]
         results["failed_stages"] = [failed_stage]
         logger.error(f"[{run_id}] Pipeline halted at {failed_stage}")
         return cast(dict[str, Any], results)
@@ -74,18 +107,18 @@ def run_full_pipeline(
     # Stage 1: Ingestion — upstream data source, must succeed
     ingestion_result = _run_stage("ingestion", IngestionAgent,
                                   target_date=target, tickers=tickers)
-    if ingestion_result.get("status") == "failed":
+    if ingestion_result.get("status") != "success":
         return _halt("ingestion")
 
     # Stage 2: Sentiment scoring — processes staging tables from Stage 1
     sentiment_result = _run_stage("sentiment", SentimentAgent)
-    if sentiment_result.get("status") == "failed":
+    if sentiment_result.get("status") != "success":
         return _halt("sentiment")
 
     # Stage 3: Calendar signals — independent of ingestion, but must succeed for Stage 4
     cal_result = _run_stage("calendar", CalendarAgent,
                             target_date=target, tickers=tickers)
-    if cal_result.get("status") == "failed":
+    if cal_result.get("status") != "success":
         return _halt("calendar")
 
     # Stage 4: Feature engineering — combines sentiment + calendar into fact_sentiment
@@ -93,23 +126,26 @@ def run_full_pipeline(
     features_result = _run_stage("features", FeatureAgent,
                                  target_date=target, tickers=tickers,
                                  calendar_signals=calendar_signals)
-    if features_result.get("status") == "failed":
+    if features_result.get("status") != "success":
         return _halt("features")
 
     # Stage 5: XGBoost prediction — reads fact_sentiment, writes fact_predictions
     prediction_result = _run_stage("prediction", PredictionAgent,
                                    target_date=target, tickers=tickers)
-    if prediction_result.get("status") == "failed":
+    if prediction_result.get("status") != "success":
         return _halt("prediction")
 
     # Stage 6: Experiment tracking (Monday/Friday only) — non-critical, failure logged but doesn't halt
-    _run_stage("experiment", ExperimentAgent, target_date=target)
+    experiment_result = _run_stage("experiment", ExperimentAgent, target_date=target)
+    results["non_critical_failures"] = (
+        ["experiment"] if experiment_result["status"] != "success" else []
+    )
 
     # All critical stages passed
     results["overall_status"] = "success"
     results["failed_stages"] = []
 
-    logger.info(f"[{run_id}] Pipeline complete — all stages passed")
+    logger.info(f"[{run_id}] Pipeline complete — all critical stages passed")
     return results
 
 

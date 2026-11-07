@@ -1,9 +1,27 @@
 # CURRENT_MODULE_STATE
 
-Updated: 4 November 2026. This is the current release and execution entry point.
+Updated: 8 November 2026. This is the current release and execution entry point.
 Earlier checkpoint text is preserved in Git/history and the workspace recovery packet.
 
-## Active continuation: SN01-A (4 November 2026)
+## Active continuation: SN02 run/status integrity (8 November 2026)
+
+Starting revision `790bd17`. The owner authorised continued implementation and
+atomic local commits. GitHub push remains owner-controlled. The first bounded
+repair is complete: runner → critical-stage status validation → halt result,
+with every downstream stage mocked. Partial, missing, malformed, unknown or
+contradictory status cannot become an ordinary successful run. Invalid/nonfinite
+durations are rejected. Unexpected stage exceptions produce bounded failure
+results without exception details; optional experiment failures remain non-critical
+and are recorded separately. Pending work is rolled back on non-success.
+All 44 new run-integrity cases pass. The offline regression suite has 234 passes,
+42 PostgreSQL skips, 6 download-calling tests deselected and 63.44% coverage.
+Ruff and focused runner typing pass. Full typing remains unverified.
+Tests exercise mocked stages and sessions. Agent commits made before validation
+still require separate transaction work. The next slice protects BaseAgent
+metadata and handles error-bearing payloads. Run correlation, real-agent contracts,
+concurrency and read models follow.
+
+## Completed SN01-A foundations (4 November 2026)
 
 The owner authorised continued implementation after SN-BASE. Starting revision:
 `1072094`; the original 30 dirty/untracked paths remain outside this work.

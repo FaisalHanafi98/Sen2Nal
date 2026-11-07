@@ -264,3 +264,37 @@ module's persisted publication-to-note journey. Score/model/history bindings,
 source rights, approved actual membership, live session integration, PostgreSQL
 and full mypy remain open. Next: independently repair SN02 run/status boundaries;
 do not use a nonblank synthetic policy reference as owner approval.
+
+## SN02.1 — Critical-stage result envelopes (8 November 2026)
+
+Starting revision: `790bd17`. Every critical runner boundary now requires explicit
+`success` to advance. Recognised `partial`, `invalid` and `failed` results halt
+with their failure kind retained. Missing/unknown/unhashable statuses, non-dict
+results, success accompanied by an error, and invalid/nonfinite/overflowing
+durations become bounded `invalid` results. Unexpected constructor/run exceptions
+become generic failed results without forwarding their text. Non-success rolls
+back pending session work and logs only stage/status context. A non-critical
+experiment failure is recorded separately and cannot invalidate valid critical
+stages. Returned payload dictionaries are copied before normalisation.
+
+Observed red/green: five partial-stage cases originally reported overall success;
+32 malformed/exception cases originally raised or misreported outcomes; five
+bad-duration cases originally reported success. All passed after their repairs.
+An additional overflowing-integer case and explicit successful empty-record envelope
+positive control pass. Empty records in an explicit success envelope are not
+themselves malformed; this does not prove real-agent record validation/empty states.
+
+| Check | Fresh result |
+|---|---|
+| Focused integrity/runner/contract run | 65 passed in 0.71s before the final two edge cases; zero blocked connection attempts |
+| Offline regression command above, plus `-q` | 234 passed, 42 skipped, 6 deselected in 6.38s. Coverage 63.44%, above the 40% floor. Zero blocked connection attempts. |
+| New integrity subset within regression | 44 passed |
+| `poetry run ruff check src/ tests/` | Exit 0 |
+| `poetry run python -m mypy src/pipeline/runner.py --follow-imports=skip --ignore-missing-imports` | Exit 0; one file with imports skipped |
+
+Self-review covers every critical stage, downstream refusal, failure-kind identity,
+exception redaction, finite numeric durations and non-critical experiment handling.
+All stages and sessions were mocks; no actual pipeline, provider or database ran.
+Rollback cannot undo earlier agent commits. Pre-persistence contracts, validated
+empty/partial data handling, run correlation, concurrent admission and read-model
+truth remain open. Next is BaseAgent-owned metadata/error-payload integrity.

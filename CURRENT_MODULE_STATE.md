@@ -42,7 +42,10 @@ stay distinct from missing scores. The offline suite passed 270 tests with 71.17
 coverage. Both prediction paths now validate database write records. The model
 path checks the binary probability distribution, and the fallback preserves zero
 and reports no new record for missing input. The offline suite passed 280 tests
-with 74.02% coverage. Ingestion record gates and concurrent admission remain open.
+with 74.02% coverage. NewsAPI and Reddit records now pass write contracts before
+staging, and malformed records trigger rollback. The offline suite passed 288
+tests with 75.80% coverage. Price and Fear & Greed record gates, provider
+availability reporting and concurrent admission remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

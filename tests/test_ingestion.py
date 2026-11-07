@@ -4,11 +4,14 @@ Tests ingestion logic with mocked external APIs (yfinance, NewsAPI, Reddit, CNN)
 No real API calls are made in tests.
 """
 
+import sys
 from datetime import date, datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.agents import ingestion
 from src.agents.ingestion import IngestionAgent, _get_stock_metadata, _parse_datetime
 from src.constants import ALLOWED_TICKERS
 
@@ -142,3 +145,76 @@ class TestHelpers:
         assert "AAPL" in result
         assert result["AAPL"]["company_name"] == "Apple Inc."
         assert result["MSFT"]["sector"] == "Technology"
+
+    def test_source_time_is_normalised_and_ambiguous_time_stays_unknown(self):
+        assert _parse_datetime("2026-03-20T14:00:00+02:00") == datetime(2026, 3, 20, 12)
+        assert _parse_datetime("2026-03-20T14:00:00") is None
+
+
+@pytest.fixture
+def text_ingestion(agent, monkeypatch):
+    monkeypatch.setattr(agent, "_ensure_stocks", MagicMock())
+    monkeypatch.setattr(agent, "_ensure_calendar", MagicMock())
+    monkeypatch.setattr(agent, "_ingest_prices", lambda *args: 0)
+    monkeypatch.setattr(agent, "_ingest_fear_greed", lambda *args: None)
+    monkeypatch.setattr(ingestion.settings, "newsapi_api_key", "fixture-only")
+    monkeypatch.setattr(ingestion.settings, "reddit_client_id", None)
+    monkeypatch.setattr(ingestion.settings, "reddit_client_secret", None)
+    monkeypatch.setattr(ingestion.time, "sleep", lambda *args: None)
+    agent.db.execute.return_value.scalar.return_value = None
+    return agent
+
+
+@pytest.mark.parametrize("articles", [
+    {}, [{"title": 17}], [{"title": "Synthetic news", "description": 12}],
+    [{"title": "Synthetic news", "url": "javascript:bad"}],
+])
+def test_invalid_news_payload_aborts_before_commit(text_ingestion, monkeypatch, articles):
+    response = MagicMock()
+    response.json.return_value = {"articles": articles}
+    monkeypatch.setattr(ingestion.requests, "get", MagicMock(return_value=response))
+    result = text_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "invalid"
+    assert result["error_code"] == "data_contract_violation"
+    text_ingestion.db.add.assert_not_called()
+    text_ingestion.db.commit.assert_not_called()
+    text_ingestion.db.rollback.assert_called_once()
+
+
+def test_missing_news_url_and_time_are_stored_as_unknown(text_ingestion, monkeypatch):
+    response = MagicMock()
+    response.json.return_value = {"articles": [{"title": "Synthetic news", "url": None}]}
+    monkeypatch.setattr(ingestion.requests, "get", MagicMock(return_value=response))
+    result = text_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "success" and result["news_ingested"] == 1
+    record = text_ingestion.db.add.call_args.args[0]
+    assert record.url is None and record.external_id is None and record.published_at is None
+    text_ingestion.db.commit.assert_called_once()
+
+
+def test_later_invalid_news_record_rolls_back_pending_writes(text_ingestion, monkeypatch):
+    response = MagicMock()
+    response.json.return_value = {"articles": [{"title": "Synthetic news"}, {"title": 17}]}
+    monkeypatch.setattr(ingestion.requests, "get", MagicMock(return_value=response))
+    result = text_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "invalid"
+    text_ingestion.db.add.assert_called_once()
+    text_ingestion.db.commit.assert_not_called()
+    text_ingestion.db.rollback.assert_called_once()
+
+
+def test_invalid_reddit_record_cannot_be_committed(text_ingestion, monkeypatch):
+    monkeypatch.setattr(ingestion.settings, "newsapi_api_key", None)
+    monkeypatch.setattr(ingestion.settings, "reddit_client_id", "fixture-only")
+    monkeypatch.setattr(ingestion.settings, "reddit_client_secret", "fixture-only")
+    client = MagicMock()
+    client.subreddit.return_value.hot.return_value = [SimpleNamespace(
+        title="$AAPL synthetic post", selftext="Example", id="fixture", author=None,
+        score=1, num_comments=-1, created_utc=1_770_000_000,
+    )]
+    monkeypatch.setitem(sys.modules, "praw", SimpleNamespace(Reddit=lambda **kwargs: client))
+    result = text_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "invalid"
+    text_ingestion.db.add.assert_not_called()
+    text_ingestion.db.commit.assert_not_called()
+    text_ingestion.db.rollback.assert_called_once()

@@ -12,7 +12,7 @@ Normalizes data, validates with contracts, stores in staging + fact tables.
 import hashlib
 import logging
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, cast
 
 import requests  # type: ignore[import-untyped]
@@ -21,6 +21,8 @@ from sqlalchemy import select
 from src.agents.base import BaseAgent
 from src.config import settings
 from src.constants import TOP_10_TICKERS
+from src.contracts.base import DataContractViolation
+from src.contracts.ingestion import NewsWrite, RedditWrite
 from src.database.models import (
     DimCalendar,
     DimFearGreed,
@@ -29,6 +31,7 @@ from src.database.models import (
     StgNewsRaw,
     StgRedditRaw,
 )
+from src.data_quality.validator import require_record
 
 logger = logging.getLogger(__name__)
 
@@ -232,40 +235,48 @@ class IngestionAgent(BaseAgent):
                     timeout=15,
                 )
                 resp.raise_for_status()
-                articles = resp.json().get("articles", [])
+            except Exception:
+                self.logger.warning("NewsAPI fetch failed for %s", ticker)
+                continue
 
-                for article in articles:
-                    headline = article.get("title", "").strip()
-                    if not headline:
-                        continue
+            try:
+                payload = resp.json()
+            except ValueError:
+                raise _invalid_ingestion_field("articles") from None
+            articles = payload.get("articles") if isinstance(payload, dict) else None
+            if not isinstance(articles, list):
+                raise _invalid_ingestion_field("articles")
 
-                    content_hash = hashlib.sha256(headline.encode()).hexdigest()
+            for article in articles:
+                if not isinstance(article, dict):
+                    raise _invalid_ingestion_field("article")
+                headline = (_source_text(article.get("title"), "headline") or "").strip()
+                if not headline:
+                    continue
 
-                    existing = self.db.execute(
-                        select(StgNewsRaw.raw_id).where(
-                            StgNewsRaw.content_hash == content_hash
-                        )
-                    ).scalar()
-                    if existing:
-                        continue
-
-                    self.db.add(StgNewsRaw(
-                        source="newsapi",
-                        external_id=article.get("url", "")[:100],
-                        headline=headline,
-                        summary=article.get("description", "")[:500] if article.get("description") else None,
-                        url=article.get("url"),
-                        published_at=_parse_datetime(article.get("publishedAt")),
-                        tickers_mentioned=[ticker],
-                        content_hash=content_hash,
-                        is_processed=False,
-                        is_duplicate=False,
-                    ))
+                content_hash = hashlib.sha256(headline.encode()).hexdigest()
+                url = _source_text(article.get("url"), "url")
+                values = {
+                    "source": "newsapi",
+                    "external_id": url[:100] if url else None,
+                    "headline": headline,
+                    "summary": _source_text(article.get("description"), "summary", 500),
+                    "url": url,
+                    "published_at": _parse_datetime(article.get("publishedAt")),
+                    "tickers_mentioned": [ticker],
+                    "content_hash": content_hash,
+                    "is_processed": False,
+                    "is_duplicate": False,
+                }
+                require_record("ingestion", NewsWrite, values)
+                existing = self.db.execute(
+                    select(StgNewsRaw.raw_id).where(StgNewsRaw.content_hash == content_hash)
+                ).scalar()
+                if not existing:
+                    self.db.add(StgNewsRaw(**values))
                     count += 1
 
-                time.sleep(1.0)  # NewsAPI rate limiting
-            except Exception as e:
-                self.logger.warning(f"NewsAPI fetch failed for {ticker}: {e}")
+            time.sleep(1.0)  # NewsAPI rate limiting
 
         self.db.flush()
         self.logger.info(f"Ingested {count} news articles")
@@ -301,41 +312,51 @@ class IngestionAgent(BaseAgent):
 
         for sub_name in subreddits:
             try:
-                subreddit = reddit.subreddit(sub_name)
-                for post in subreddit.hot(limit=50):
-                    # Check if post mentions any of our tickers
-                    text = f"{post.title} {post.selftext}"
-                    mentioned = [t for t in ticker_set if f"${t}" in text or f" {t} " in text]
-                    if not mentioned:
-                        continue
+                posts = list(reddit.subreddit(sub_name).hot(limit=50))
+            except Exception:
+                self.logger.warning("Reddit fetch failed for r/%s", sub_name)
+                continue
 
-                    existing = self.db.execute(
-                        select(StgRedditRaw.raw_id).where(
-                            StgRedditRaw.subreddit == sub_name,
-                            StgRedditRaw.post_id == post.id,
-                        )
-                    ).scalar()
-                    if existing:
-                        continue
+            for post in posts:
+                title = _source_text(getattr(post, "title", None), "title")
+                body = _source_text(getattr(post, "selftext", None), "body")
+                text = f"{title or ''} {body or ''}"
+                mentioned = sorted(t for t in ticker_set if f"${t}" in text or f" {t} " in text)
+                if not mentioned:
+                    continue
 
-                    self.db.add(StgRedditRaw(
-                        subreddit=sub_name,
-                        post_id=post.id,
-                        post_type="submission",
-                        title=post.title[:500] if post.title else None,
-                        body=post.selftext[:2000] if post.selftext else None,
-                        author=str(post.author)[:50] if post.author else None,
-                        score=post.score,
-                        num_comments=post.num_comments,
-                        created_utc=datetime.utcfromtimestamp(post.created_utc),
-                        tickers_mentioned=mentioned,
-                        is_processed=False,
-                    ))
+                timestamp = getattr(post, "created_utc", None)
+                if isinstance(timestamp, bool) or not isinstance(timestamp, (float, int)):
+                    raise _invalid_ingestion_field("created_utc")
+                try:
+                    created_utc = datetime.fromtimestamp(timestamp, timezone.utc).replace(tzinfo=None)
+                except (OverflowError, OSError, ValueError):
+                    raise _invalid_ingestion_field("created_utc") from None
+                values = {
+                    "subreddit": sub_name,
+                    "post_id": getattr(post, "id", None),
+                    "post_type": "submission",
+                    "title": title[:500] if title else None,
+                    "body": body[:2000] if body else None,
+                    "author": str(post.author)[:50] if getattr(post, "author", None) else None,
+                    "score": getattr(post, "score", None),
+                    "num_comments": getattr(post, "num_comments", None),
+                    "created_utc": created_utc,
+                    "tickers_mentioned": mentioned,
+                    "is_processed": False,
+                }
+                require_record("ingestion", RedditWrite, values)
+                existing = self.db.execute(
+                    select(StgRedditRaw.raw_id).where(
+                        StgRedditRaw.subreddit == sub_name,
+                        StgRedditRaw.post_id == post.id,
+                    )
+                ).scalar()
+                if not existing:
+                    self.db.add(StgRedditRaw(**values))
                     count += 1
 
-                time.sleep(0.5)
-            except Exception as e:
-                self.logger.warning(f"Reddit fetch failed for r/{sub_name}: {e}")
+            time.sleep(0.5)
 
         self.db.flush()
         self.logger.info(f"Ingested {count} Reddit posts")
@@ -394,14 +415,14 @@ class IngestionAgent(BaseAgent):
     # =========================================================================
 
     def _get_stock_id(self, ticker: str) -> int | None:
-        return self.db.execute(
+        return cast(int | None, self.db.execute(
             select(DimStock.stock_id).where(DimStock.ticker == ticker)
-        ).scalar()
+        ).scalar())
 
     def _get_or_create_date_id(self, d: date) -> int:
-        date_id = self.db.execute(
+        date_id = cast(int | None, self.db.execute(
             select(DimCalendar.date_id).where(DimCalendar.date == d)
-        ).scalar()
+        ).scalar())
         if date_id:
             return date_id
         self._ensure_calendar(d)
@@ -449,10 +470,25 @@ def _get_stock_metadata(tickers: list[str]) -> dict[str, dict[str, Any]]:
     return result
 
 
-def _parse_datetime(s: str | None) -> datetime | None:
-    if not s:
+def _invalid_ingestion_field(field: str) -> DataContractViolation:
+    return DataContractViolation("ingestion", [{"loc": (field,), "type": "invalid_source_field"}])
+
+
+def _source_text(value: object, field: str, limit: int | None = None) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or "\x00" in value:
+        raise _invalid_ingestion_field(field)
+    return value[:limit] or None
+
+
+def _parse_datetime(s: object) -> datetime | None:
+    if not isinstance(s, str):
         return None
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
+        parsed = datetime.fromisoformat(s)
+        if parsed.tzinfo is not None:
+            return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    except (OverflowError, ValueError):
         return None
+    return None

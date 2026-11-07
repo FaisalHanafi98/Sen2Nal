@@ -424,3 +424,17 @@ Coverage was 74.02%, with zero blocked connection attempts. Ruff and focused
 mypy passed. Tests mock training, inference and database sessions. The existing
 evaluation design remains deferred. Model artifact lifecycle and durable
 PostgreSQL transaction verification remain open.
+
+## SN02.9 — News and Reddit staging validation (8 November 2026)
+
+Starting revision `5ed25d4`. Ingestion validates news and Reddit records before
+adding them. A malformed record stops the stage and rolls back pending writes.
+News timestamps with offsets are stored in UTC. Missing or ambiguous publication
+times and missing URLs remain unknown. Transport warnings omit exception text.
+
+Seven focused assertions failed before repair. The offline suite passed 288
+tests, skipped 42 PostgreSQL cases and deselected six download-calling cases
+in 4.49s. Coverage was 75.80%, with zero blocked connection attempts. Ruff and
+focused mypy with skipped imports passed. Tests use fixture payloads and mocked
+sessions. Provider response compatibility and PostgreSQL transactions still
+require verification.

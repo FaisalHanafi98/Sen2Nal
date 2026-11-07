@@ -369,3 +369,13 @@ ExperimentTable hook warning. Browser and live API verification remain open.
 The build used the current worktree. Git's `lib/` ignore rule excludes three
 existing frontend modules that tracked components import. Source tracking for
 those modules is a separate checkout fix.
+
+## Frontend source tracking (8 November 2026)
+
+Starting revision `9fc0c0d`. The root `lib/` rule ignored the existing frontend
+animation, constants and utility modules. A source export from the index failed
+to bundle with fourteen unresolved imports into those three modules. The narrow
+frontend exception and the three reviewed modules produce a passing bundle from
+the staged export with the installed dependency tree. The synthetic nested Python
+`lib/` check remains ignored. This verifies source availability and import
+resolution. The worktree Vite build is recorded in SN02.5.

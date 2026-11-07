@@ -352,3 +352,20 @@ cases deselected and 66.86% coverage. The final focused run passed all 60 pipeli
 integrity tests after adding deterministic ordering for null start times. Ruff
 and focused router mypy passed. Both test runs reported zero blocked connection
 attempts. Live PostgreSQL query execution and dashboard rendering remain open.
+
+## SN02.5 — Dashboard run-state display (8 November 2026)
+
+Starting revision `be20c9d`. The dashboard uses the run state from the status API,
+includes the calendar node and labels unreported stages in text. Sample responses
+carry a visible sample marker. The status card describes the latest saved run.
+
+The local `verify-dashboard.cjs` check failed when a saved failed run rendered
+as idle. It now passes for failed, running and unverified inputs, calendar and
+unreported labels, and sample mode. It renders the actual dashboard and pipeline
+components to static markup with synthetic data and stubbed unrelated widgets.
+The test is in the ignored session directory. `npm run build` passed with the
+existing chunk-size warning. `npm run lint` exited zero with the existing
+ExperimentTable hook warning. Browser and live API verification remain open.
+The build used the current worktree. Git's `lib/` ignore rule excludes three
+existing frontend modules that tracked components import. Source tracking for
+those modules is a separate checkout fix.

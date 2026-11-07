@@ -59,7 +59,11 @@ export interface PipelineStatus {
   duration: number
 }
 
+export type PipelineRunStatus = 'idle' | 'running' | 'success' | 'failed' | 'unverified'
+
 export interface DashboardData {
+  dataMode: 'live' | 'sample'
+  pipelineRunStatus: PipelineRunStatus
   stocks: StockSentiment[]
   sentimentHistory: SentimentHistory[]
   experiments: ExperimentWeek[]

@@ -15,7 +15,11 @@ async function fetchLiveData(): Promise<DashboardData> {
     apiClient.get('/pipeline/logs'),
   ])
 
+  const runStatus: unknown = pipeRes.data.pipelineStatus
   return {
+    dataMode: 'live',
+    pipelineRunStatus: runStatus === 'idle' || runStatus === 'running' ||
+      runStatus === 'success' || runStatus === 'failed' ? runStatus : 'unverified',
     stocks: stocksRes.data.stocks ?? [],
     sentimentHistory: historyRes.data.history ?? [],
     experiments: expRes.data.experiments ?? [],

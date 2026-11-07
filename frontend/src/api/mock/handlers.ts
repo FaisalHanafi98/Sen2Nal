@@ -13,6 +13,8 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export async function fetchDashboardData(): Promise<DashboardData> {
   await delay(300)
   return {
+    dataMode: 'sample',
+    pipelineRunStatus: 'running',
     stocks: mockStocks,
     sentimentHistory: mockSentimentHistory,
     experiments: mockExperiments,

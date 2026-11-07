@@ -11,6 +11,14 @@ import ExperimentTable from '@/components/experiments/ExperimentTable'
 import AiVsHumanPanel from '@/components/experiments/AiVsHumanPanel'
 import PipelineFlow from '@/components/pipeline/PipelineFlow'
 
+const runStatusLabels = {
+  idle: 'Idle',
+  running: 'Running',
+  success: 'Succeeded',
+  failed: 'Failed',
+  unverified: 'Unverified',
+}
+
 export default function Dashboard() {
   const { data, isLoading } = useDashboardData()
 
@@ -26,7 +34,6 @@ export default function Dashboard() {
 
   const bullishCount = data.stocks.filter((s) => s.signal === 'STRONG_BUY' || s.signal === 'BUY').length
   const bullishPct = ((bullishCount / data.stocks.length) * 100).toFixed(0)
-  const pipelineRunning = data.pipelineStatuses.some((s) => s.status === 'running')
 
   return (
     <motion.div
@@ -35,6 +42,9 @@ export default function Dashboard() {
       animate="visible"
       className="space-y-6"
     >
+      {data.dataMode === 'sample' && (
+        <p className="text-xs font-mono text-nightops-secondary">Sample data</p>
+      )}
       {/* KPI Row */}
       <motion.div variants={staggerContainer} className="grid grid-cols-4 gap-4">
         <KpiCard
@@ -53,8 +63,8 @@ export default function Dashboard() {
         />
         <KpiCard
           label="Pipeline Status"
-          value={pipelineRunning ? 'Running' : 'Idle'}
-          subtitle="Daily batch @ 06:00 UTC"
+          value={runStatusLabels[data.pipelineRunStatus]}
+          subtitle="Latest saved run"
           glowColor="purple"
         />
         <KpiCard

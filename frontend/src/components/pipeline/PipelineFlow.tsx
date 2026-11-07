@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { COLORS, PIPELINE_STAGES } from '@/lib/constants'
+import { COLORS } from '@/lib/constants'
 import type { PipelineStatus } from '@/types'
 
 interface Props {
@@ -13,7 +13,20 @@ const statusColors = {
   error: COLORS.bearish,
 }
 
-const stageIcons = ['IN', 'NLP', 'FE', 'ML', 'OUT']
+const pipelineStages = [
+  { stage: 'Data Ingestion', icon: 'IN' },
+  { stage: 'FinBERT NLP', icon: 'NLP' },
+  { stage: 'Calendar Patterns', icon: 'CAL' },
+  { stage: 'Feature Engineering', icon: 'FE' },
+  { stage: 'XGBoost Prediction', icon: 'ML' },
+  { stage: 'Output & Storage', icon: 'OUT' },
+]
+const stageStatusLabels = {
+  idle: 'Unreported',
+  running: 'Running',
+  complete: 'Complete',
+  error: 'Error',
+}
 
 export default function PipelineFlow({ statuses }: Props) {
   return (
@@ -22,14 +35,15 @@ export default function PipelineFlow({ statuses }: Props) {
         ML Pipeline Status
       </h3>
 
-      <div className="flex items-center justify-between px-2">
-        {PIPELINE_STAGES.map((stage, i) => {
+      <div className="flex items-center justify-between overflow-x-auto px-2">
+        {pipelineStages.map(({ stage, icon }, i) => {
           const status = statuses.find((s) => s.stage === stage)
-          const color = status ? statusColors[status.status] : COLORS.muted
+          const state = status?.status ?? 'idle'
+          const color = statusColors[state]
           const isRunning = status?.status === 'running'
 
           return (
-            <div key={stage} className="flex items-center">
+            <div key={stage} className="flex shrink-0 items-center">
               {/* Node */}
               <div className="flex flex-col items-center gap-2">
                 <motion.div
@@ -45,23 +59,23 @@ export default function PipelineFlow({ statuses }: Props) {
                   style={{ borderColor: color, backgroundColor: `${color}15` }}
                 >
                   <span className="text-xs font-mono font-bold" style={{ color }}>
-                    {stageIcons[i]}
+                    {icon}
                   </span>
                 </motion.div>
                 <div className="text-center">
                   <p className="text-[10px] font-mono text-nightops-secondary leading-tight max-w-16">
                     {stage}
                   </p>
-                  {status && (
-                    <p className="text-[9px] font-mono mt-0.5" style={{ color }}>
-                      {status.duration.toFixed(1)}s
-                    </p>
-                  )}
+                  <p className="text-[9px] font-mono mt-0.5" style={{ color }}>
+                    {stageStatusLabels[state]}
+                    {status && state !== 'idle' && stage !== 'Output & Storage'
+                      ? ` · ${status.duration.toFixed(1)}s` : ''}
+                  </p>
                 </div>
               </div>
 
               {/* Connector */}
-              {i < PIPELINE_STAGES.length - 1 && (
+              {i < pipelineStages.length - 1 && (
                 <svg width="40" height="4" className="mx-1 -mt-6">
                   <motion.line
                     x1="0" y1="2" x2="40" y2="2"

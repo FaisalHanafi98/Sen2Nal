@@ -29,8 +29,10 @@ with mocked sessions and stages. The latest offline run passed 248 tests, skippe
 coverage. The status endpoint now reads a single saved run, with an optional run
 ID filter. Stage outcomes and counts come from its correlated report. A legacy
 success without a matching report appears as unverified. The offline suite for
-this slice passed 257 tests with 66.86% coverage. Dashboard consumption, real-agent
-contracts and concurrent admission follow.
+this slice passed 257 tests with 66.86% coverage. The dashboard displays the saved
+run state, includes calendar status and labels sample mode. Static React rendering,
+the Vite build and lint passed. Real-agent contracts and concurrent admission
+follow.
 
 ## Completed SN01-A foundations (4 November 2026)
 

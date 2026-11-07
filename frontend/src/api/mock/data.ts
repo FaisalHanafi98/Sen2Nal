@@ -95,6 +95,7 @@ export const mockPipelineLogs: PipelineLog[] = generatePipelineLogs()
 export const mockPipelineStatuses: PipelineStatus[] = [
   { stage: 'Data Ingestion', status: 'complete', lastRun: new Date().toISOString(), duration: 12.4 },
   { stage: 'FinBERT NLP', status: 'complete', lastRun: new Date().toISOString(), duration: 18.7 },
+  { stage: 'Calendar Patterns', status: 'complete', lastRun: new Date().toISOString(), duration: 0.8 },
   { stage: 'Feature Engineering', status: 'complete', lastRun: new Date().toISOString(), duration: 5.2 },
   { stage: 'XGBoost Prediction', status: 'complete', lastRun: new Date().toISOString(), duration: 2.3 },
   { stage: 'Output & Storage', status: 'running', lastRun: new Date().toISOString(), duration: 8.6 },

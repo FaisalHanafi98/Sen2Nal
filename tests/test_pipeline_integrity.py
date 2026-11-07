@@ -1,6 +1,7 @@
 """Run truth at the orchestrator boundary, using only mocked stages/sessions."""
 
-from datetime import date
+from datetime import date, datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import anyio.to_thread
@@ -207,3 +208,98 @@ def test_mismatched_stage_id_stops_the_active_run(stages):
     assert result["failure_kind"] == "invalid"
     assert result["stages"]["ingestion"]["run_id"] == result["run_id"]
     stages[1].assert_not_called()
+
+
+def status_row(status, stages=None, *, report_id="saved-run"):
+    day = date(2026, 11, 4)
+    return SimpleNamespace(
+        run_id="saved-run", target_date=day, status=status,
+        started_at=datetime(2026, 11, 4, 13),
+        finished_at=datetime(2026, 11, 4, 13, 1) if status != "running" else None,
+        result_json={"run_id": report_id, "target_date": day.isoformat(),
+                     "overall_status": status, "stages": stages} if stages is not None else None,
+    )
+
+
+def test_status_reports_the_failed_run_even_with_historical_fact_rows(pipeline_client):
+    send, db, _, _ = pipeline_client
+    db.execute.return_value.scalar.return_value = 77
+    db.execute.return_value.scalar_one_or_none.return_value = status_row("failed", {
+        "ingestion": {"status": "partial", "elapsed_seconds": 1.2, "run_id": "saved-run",
+                      "error": "private input detail"},
+    })
+    response = send("GET", "/api/v1/pipeline/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["runId"] == "saved-run"
+    assert payload["pipelineStatus"] == "failed"
+    stages = {stage["stage"]: stage for stage in payload["stages"]}
+    assert stages["Data Ingestion"]["status"] == "error"
+    assert stages["Data Ingestion"]["outcome"] == "partial"
+    assert all(stage["status"] == "idle" for name, stage in stages.items()
+               if name != "Data Ingestion")
+    assert "private input detail" not in response.text
+    db.execute.assert_called_once()
+
+
+def test_legacy_success_with_an_unrelated_result_stays_unverified(pipeline_client):
+    send, db, _, _ = pipeline_client
+    db.execute.return_value.scalar.return_value = 77
+    db.execute.return_value.scalar_one_or_none.return_value = status_row(
+        "success", {}, report_id="different-run",
+    )
+    payload = send("GET", "/api/v1/pipeline/status").json()
+    assert payload["pipelineStatus"] == "unverified"
+    assert payload["recordedStatus"] == "success"
+    assert all(stage["status"] == "idle" for stage in payload["stages"])
+
+
+def test_status_retains_zero_counts_for_a_correlated_completed_stage(pipeline_client):
+    send, db, _, _ = pipeline_client
+    results = {name: {"status": "success", "run_id": "saved-run", "elapsed_seconds": 0.1}
+               for name in STAGES[:5]}
+    results["ingestion"]["news_ingested"] = 0
+    db.execute.return_value.scalar.return_value = 77
+    db.execute.return_value.scalar_one_or_none.return_value = status_row("success", results)
+    payload = send("GET", "/api/v1/pipeline/status").json()
+    assert payload["pipelineStatus"] == "success"
+    stages = {stage["stage"]: stage for stage in payload["stages"]}
+    assert stages["Data Ingestion"]["details"] == {"news": 0}
+    assert stages["Calendar Patterns"]["status"] == "complete"
+    assert stages["Output & Storage"]["status"] == "complete"
+
+
+def test_status_for_active_run_avoids_guessing_which_stage_is_running(pipeline_client):
+    send, db, _, _ = pipeline_client
+    db.execute.return_value.scalar.return_value = 77
+    db.execute.return_value.scalar_one_or_none.return_value = status_row("running")
+    payload = send("GET", "/api/v1/pipeline/status").json()
+    assert payload["pipelineStatus"] == "running"
+    assert all(stage["status"] == "idle" for stage in payload["stages"])
+
+
+def test_status_can_request_one_run_and_rejects_invalid_ids(pipeline_client):
+    send, db, _, _ = pipeline_client
+    db.execute.return_value.scalar.return_value = 0
+    db.execute.return_value.scalar_one_or_none.return_value = None
+    assert send("GET", "/api/v1/pipeline/status", params={"run_id": "invalid/id"}).status_code == 422
+    db.execute.assert_not_called()
+    assert send("GET", "/api/v1/pipeline/status", params={"run_id": "missing"}).status_code == 404
+    assert "missing" in db.execute.call_args.args[0].compile().params.values()
+
+
+@pytest.mark.parametrize("override", [
+    {"run_id": "another-run"}, {"elapsed_seconds": "unknown"},
+    {"elapsed_seconds": float("inf")}, {"error": "private detail"},
+])
+def test_inconsistent_stage_report_cannot_certify_saved_success(pipeline_client, override):
+    send, db, _, _ = pipeline_client
+    reports = {name: {"status": "success", "run_id": "saved-run", "elapsed_seconds": 0.2}
+               for name in STAGES[:5]}
+    reports["prediction"].update(override)
+    db.execute.return_value.scalar_one_or_none.return_value = status_row("success", reports)
+    payload = send("GET", "/api/v1/pipeline/status", params={"run_id": "saved-run"}).json()
+    assert payload["runId"] == "saved-run"
+    assert payload["pipelineStatus"] == "unverified"
+    assert payload["stages"][-2]["status"] == "idle"
+    assert payload["stages"][-1]["status"] == "idle"

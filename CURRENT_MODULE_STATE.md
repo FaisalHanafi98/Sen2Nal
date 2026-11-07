@@ -26,7 +26,11 @@ and date to all stages. It rejects foreign stage IDs and mismatched results.
 The socket-free ASGI tests exercise configured-key denial and a permitted trigger
 with mocked sessions and stages. The latest offline run passed 248 tests, skipped
 42 PostgreSQL tests, deselected six download-calling cases and reached 65.56%
-coverage. Real-agent contracts, concurrent admission and run-specific reads follow.
+coverage. The status endpoint now reads a single saved run, with an optional run
+ID filter. Stage outcomes and counts come from its correlated report. A legacy
+success without a matching report appears as unverified. The offline suite for
+this slice passed 257 tests with 66.86% coverage. Dashboard consumption, real-agent
+contracts and concurrent admission follow.
 
 ## Completed SN01-A foundations (4 November 2026)
 

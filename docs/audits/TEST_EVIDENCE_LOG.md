@@ -336,3 +336,19 @@ path. The synthetic tests cover allowed and denied requests, mismatched identity
 terminal or missing rows, safe error text and worker-session cleanup. Review
 remains open for PostgreSQL transactions, concurrent admission and worker
 scheduling. The worker still uses the existing asynchronous dispatch shape.
+
+## SN02.4 — Run-specific status projection (8 November 2026)
+
+Starting revision `be37835`. The status endpoint queries the latest saved run
+or a requested run ID. It projects the five critical stages from a matching
+run, date and outcome. Zero counts remain visible, active runs keep their
+recorded running state, and unsupported legacy success is unverified. The
+projection includes only recognised status, duration and count fields. Its
+storage indicator refers to the saved run result.
+
+Five ASGI regressions failed against the historical-count implementation.
+The offline suite passed 257 tests with 42 PostgreSQL skips, six download-calling
+cases deselected and 66.86% coverage. The final focused run passed all 60 pipeline
+integrity tests after adding deterministic ordering for null start times. Ruff
+and focused router mypy passed. Both test runs reported zero blocked connection
+attempts. Live PostgreSQL query execution and dashboard rendering remain open.

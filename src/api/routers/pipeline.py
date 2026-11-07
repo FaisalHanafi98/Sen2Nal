@@ -1,25 +1,18 @@
 """Pipeline monitoring and control endpoints."""
 
 import logging
+import math
 from datetime import datetime
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, Depends, BackgroundTasks, Header, HTTPException
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, BackgroundTasks, Header, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.config import settings
 from src.constants import API_PREFIX
 from src.database.connection import get_db
-from src.database.models import (
-    FactSentiment,
-    FactPrice,
-    FactPrediction,
-    PipelineLog,
-    PipelineRun,
-    StgNewsRaw,
-    StgRedditRaw,
-)
+from src.database.models import PipelineLog, PipelineRun
 
 logger = logging.getLogger(__name__)
 
@@ -34,80 +27,94 @@ def verify_pipeline_key(x_api_key: str | None = Header(default=None)) -> None:
 
 router = APIRouter(prefix=f"{API_PREFIX}/pipeline", tags=["Pipeline"])
 
+_STAGE_VIEWS = (
+    ("ingestion", "Data Ingestion", {
+        "news": "news_ingested", "reddit": "reddit_ingested", "prices": "prices_ingested",
+    }),
+    ("sentiment", "FinBERT NLP", {"newsProcessed": "news_processed",
+                                  "redditProcessed": "reddit_processed"}),
+    ("calendar", "Calendar Patterns", {"tickersComputed": "tickers_computed"}),
+    ("features", "Feature Engineering", {"sentimentRows": "rows_written"}),
+    ("prediction", "XGBoost Prediction", {"predictions": "predictions_generated"}),
+)
+
+RunIdFilter = Annotated[str | None, Query(pattern=r"^[A-Za-z0-9_-]{1,50}$")]
+
+
+def _reported_duration(value: object) -> float | None:
+    if not isinstance(value, (float, int)) or isinstance(value, bool):
+        return None
+    try:
+        seconds = float(value)
+    except OverflowError:
+        return None
+    return seconds if math.isfinite(seconds) and seconds >= 0 else None
+
+
+def _stage_view(label: str, report: object, run_id: str | None,
+                last_run: str | None, counters: dict[str, str]) -> dict[str, Any]:
+    view: dict[str, Any] = {"stage": label, "status": "idle", "lastRun": "",
+                            "duration": 0, "outcome": "unreported"}
+    if not isinstance(report, dict) or report.get("run_id") != run_id:
+        return view
+    outcome = report.get("status")
+    duration = _reported_duration(report.get("elapsed_seconds"))
+    if outcome not in ("success", "failed", "invalid", "partial") or duration is None:
+        return view
+    if outcome == "success" and report.get("error") not in (None, ""):
+        return view
+    view.update(status="complete" if outcome == "success" else "error",
+                lastRun=last_run or "", duration=duration, outcome=outcome)
+    if outcome == "success":
+        details = {}
+        for name, source in counters.items():
+            count = report.get(source)
+            if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+                details[name] = count
+        view["details"] = details
+    return view
+
 
 @router.get("/status")
-def get_pipeline_status(db: Session = Depends(get_db)):
-    """Get pipeline stage statuses — powers the pipeline flow diagram."""
-    news_total = db.execute(select(func.count(StgNewsRaw.raw_id))).scalar() or 0
-    news_processed = db.execute(
-        select(func.count(StgNewsRaw.raw_id)).where(StgNewsRaw.is_processed.is_(True))
-    ).scalar() or 0
-    reddit_total = db.execute(select(func.count(StgRedditRaw.raw_id))).scalar() or 0
-    reddit_processed = db.execute(
-        select(func.count(StgRedditRaw.raw_id)).where(StgRedditRaw.is_processed.is_(True))
-    ).scalar() or 0
-    sentiment_count = db.execute(select(func.count(FactSentiment.sentiment_id))).scalar() or 0
-    price_count = db.execute(select(func.count(FactPrice.price_id))).scalar() or 0
-    prediction_count = db.execute(select(func.count(FactPrediction.prediction_id))).scalar() or 0
+def get_pipeline_status(run_id: RunIdFilter = None, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Project stage outcomes from one saved run and its correlated report."""
+    query = select(PipelineRun)
+    if run_id is None:
+        query = query.order_by(PipelineRun.started_at.desc().nulls_last(), PipelineRun.id.desc()).limit(1)
+    else:
+        query = query.where(PipelineRun.run_id == run_id)
+    record = cast(Any, db.execute(query).scalar_one_or_none())
+    if record is None and run_id is not None:
+        raise HTTPException(status_code=404, detail="Pipeline run not found")
 
-    latest_date = db.execute(
-        select(func.max(FactSentiment.created_at))
-    ).scalar()
-
-    stages = [
-        {
-            "stage": "Data Ingestion",
-            "status": "complete" if news_total > 0 else "idle",
-            "lastRun": str(latest_date) if latest_date else "",
-            "duration": 0,
-            "details": {"news": news_total, "reddit": reddit_total, "prices": price_count},
-        },
-        {
-            "stage": "FinBERT NLP",
-            "status": "complete" if news_processed > 0 else "idle",
-            "lastRun": str(latest_date) if latest_date else "",
-            "duration": 0,
-            "details": {"newsProcessed": news_processed, "redditProcessed": reddit_processed},
-        },
-        {
-            "stage": "Feature Engineering",
-            "status": "complete" if sentiment_count > 0 else "idle",
-            "lastRun": str(latest_date) if latest_date else "",
-            "duration": 0,
-            "details": {"sentimentRows": sentiment_count},
-        },
-        {
-            "stage": "XGBoost Prediction",
-            "status": "complete" if prediction_count > 0 else "idle",
-            "lastRun": str(latest_date) if latest_date else "",
-            "duration": 0,
-            "details": {"predictions": prediction_count},
-        },
-        {
-            "stage": "Output & Storage",
-            "status": "complete" if sentiment_count > 0 else "idle",
-            "lastRun": str(latest_date) if latest_date else "",
-            "duration": 0,
-        },
-    ]
-
-    # Pipeline-level status from DB
-    latest_run = db.execute(
-        select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(1)
-    ).scalar_one_or_none()
-
-    pipeline_status = "idle"
-    last_run_time = None
-    if latest_run:
-        latest_run_record = cast(Any, latest_run)
-        pipeline_status = latest_run_record.status
-        last_run_time = (
-            str(latest_run_record.started_at) if latest_run_record.started_at else None
-        )
-
+    selected_id = record.run_id if record is not None else None
+    last_run = record.started_at.isoformat() if record is not None and record.started_at else None
+    target_date = record.target_date.isoformat() if record is not None else None
+    recorded_status = record.status if record is not None else "idle"
+    report = record.result_json if record is not None else None
+    reports: dict[str, Any] = {}
+    if (record is not None and record.finished_at is not None
+            and recorded_status in ("success", "failed") and isinstance(report, dict)
+            and report.get("run_id") == selected_id and report.get("target_date") == target_date
+            and report.get("overall_status") == recorded_status
+            and isinstance(report.get("stages"), dict)):
+        reports = report["stages"]
+    stages = [_stage_view(label, reports.get(key), selected_id, last_run, counters)
+              for key, label, counters in _STAGE_VIEWS]
+    complete = recorded_status == "success" and all(stage["status"] == "complete" for stage in stages)
+    if complete or recorded_status in ("idle", "running", "failed"):
+        pipeline_status = recorded_status
+    else:
+        pipeline_status = "unverified"
+    stages.append({"stage": "Output & Storage", "status": "complete" if complete else "idle",
+                   "lastRun": (last_run or "") if complete else "", "duration": 0,
+                   "outcome": "success" if complete else "unreported"})
     return {
         "pipelineStatus": pipeline_status,
-        "lastRun": last_run_time,
+        "recordedStatus": recorded_status,
+        "runId": selected_id,
+        "targetDate": target_date,
+        "lastRun": last_run,
         "stages": stages,
     }
 

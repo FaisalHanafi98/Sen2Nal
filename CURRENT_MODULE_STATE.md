@@ -39,7 +39,10 @@ back pending work when validation fails. The offline suite passed 264 tests with
 68.66% coverage. Feature records now pass a write contract before they are added.
 A later ticker failure rolls back pending feature writes. Observed zero scores
 stay distinct from missing scores. The offline suite passed 270 tests with 71.17%
-coverage. Ingestion and prediction record gates and concurrent admission remain open.
+coverage. Both prediction paths now validate database write records. The model
+path checks the binary probability distribution, and the fallback preserves zero
+and reports no new record for missing input. The offline suite passed 280 tests
+with 74.02% coverage. Ingestion record gates and concurrent admission remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

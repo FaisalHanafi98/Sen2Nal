@@ -408,3 +408,19 @@ skipped 42 PostgreSQL cases and deselected six download-calling cases in 5.30s.
 Coverage was 71.17%, with zero blocked connection attempts. Ruff and focused
 mypy passed. Tests use the real feature agent with mocked reads and sessions.
 PostgreSQL transaction verification remains open.
+
+## SN02.8 — Prediction write validation (8 November 2026)
+
+Starting revision `56e6ea3`. Both legacy prediction paths validate the actual
+fact write fields. The model path requires a finite binary probability vector
+that sums to one within floating-point tolerance. Contribution proxies must be
+finite. The fallback keeps a real zero, skips missing scores and uses a version
+identifier that fits the existing column. The result records the active mode,
+validated count, empty state and the research disclaimer.
+
+Ten focused assertions failed before repair. The offline suite passed 280 tests,
+skipped 42 PostgreSQL cases and deselected six download-calling cases in 5.82s.
+Coverage was 74.02%, with zero blocked connection attempts. Ruff and focused
+mypy passed. Tests mock training, inference and database sessions. The existing
+evaluation design remains deferred. Model artifact lifecycle and durable
+PostgreSQL transaction verification remain open.

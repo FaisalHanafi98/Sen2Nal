@@ -3,7 +3,7 @@
 Trains and runs an XGBoost model for weekly directional prediction.
 - Walk-forward validation: 252-day training window, 21-day test window
 - Features from fact_sentiment + fact_prices
-- SHAP explainability for every prediction
+- Feature contribution proxies from model importance and input values
 - Stores predictions in fact_predictions
 """
 
@@ -16,6 +16,9 @@ import numpy as np
 from sqlalchemy import select, and_
 
 from src.agents.base import BaseAgent
+from src.contracts.base import DataContractViolation
+from src.contracts.prediction import PredictionWrite
+from src.data_quality.validator import require_record
 from src.database.models import DimCalendar, DimStock, FactPrediction, FactPrice, FactSentiment
 
 logger = logging.getLogger(__name__)
@@ -31,6 +34,14 @@ FEATURE_COLS = [
     "combined_score", "conflict_flag_int",
     "daily_return", "intraday_range", "volume_norm",
 ]
+
+
+def _prediction_summary(target: date, count: int, mode: str) -> dict[str, Any]:
+    return {
+        "target_date": str(target), "predictions_generated": count, "mode": mode,
+        "records_validated": count, "data_state": "present" if count else "empty",
+        "disclaimer": "NOT FINANCIAL ADVICE",
+    }
 
 
 class PredictionAgent(BaseAgent):
@@ -69,11 +80,7 @@ class PredictionAgent(BaseAgent):
         predictions = self._predict(model, target, ticker_list)
 
         self.db.commit()
-        return {
-            "target_date": str(target),
-            "training_samples": len(X),
-            "predictions_generated": predictions,
-        }
+        return {**_prediction_summary(target, predictions, "xgboost"), "training_samples": len(X)}
 
     def _build_dataset(self, tickers: list[str]) -> tuple[np.ndarray, np.ndarray, list]:
         """Build feature matrix from historical fact_sentiment + fact_prices."""
@@ -215,16 +222,25 @@ class PredictionAgent(BaseAgent):
                 float(price.volume or 0) / 1e8 if price else 0,
             ]])
 
-            proba = model.predict_proba(features)[0]
+            raw_distribution = model.predict_proba(features)
+            try:
+                distribution = np.asarray(raw_distribution)
+            except (TypeError, ValueError) as exc:
+                raise DataContractViolation("prediction", [{"type": "probability_distribution"}]) from exc
+            if (distribution.shape != (1, 2) or distribution.dtype.kind not in "fiu"
+                    or not np.isfinite(distribution).all()
+                    or ((distribution < 0) | (distribution > 1)).any()
+                    or not np.isclose(distribution.sum(), 1.0, rtol=0.0, atol=1e-6)):
+                raise DataContractViolation("prediction", [{"type": "probability_distribution"}])
+            proba = distribution[0]
             direction = int(np.argmax(proba))
             probability = float(proba[direction])
 
-            # SHAP values
-            shap_dict = {}
+            feature_contributions = {}
             try:
                 feature_imp = model.feature_importances_
                 for i, col in enumerate(FEATURE_COLS):
-                    shap_dict[col] = round(float(feature_imp[i] * features[0][i]), 4)
+                    feature_contributions[col] = round(float(feature_imp[i] * features[0][i]), 4)
             except Exception:
                 pass
 
@@ -239,7 +255,7 @@ class PredictionAgent(BaseAgent):
             if existing:
                 continue
 
-            self.db.add(FactPrediction(
+            values = dict(
                 stock_id=stock_id,
                 date_id=date_id,
                 prediction_date=target,
@@ -248,8 +264,10 @@ class PredictionAgent(BaseAgent):
                 predicted_score=round(probability, 3),
                 predicted_confidence=round(probability, 3),
                 model_version="xgb-v1.0",
-                feature_importance=shap_dict,
-            ))
+                feature_importance=feature_contributions,
+            )
+            require_record("prediction", PredictionWrite, values)
+            self.db.add(FactPrediction(**values))
             count += 1
 
         self.db.flush()
@@ -262,7 +280,7 @@ class PredictionAgent(BaseAgent):
             select(DimCalendar.date_id).where(DimCalendar.date == target)
         ).scalar()
         if not date_id:
-            return {"predictions_generated": 0, "mode": "fallback"}
+            return _prediction_summary(target, 0, "fallback")
 
         count = 0
         target_end = target + timedelta(days=7)
@@ -279,10 +297,10 @@ class PredictionAgent(BaseAgent):
                     FactSentiment.stock_id == stock_id
                 ).order_by(FactSentiment.date_id.desc()).limit(1)
             ).scalar()
-            if not sent:
+            if sent is None or sent.combined_score is None:
                 continue
 
-            score = float(sent.combined_score or 0.5)
+            score = float(sent.combined_score)
             direction = "UP" if score >= 0.5 else "DOWN"
             probability = abs(score - 0.5) * 2  # Map [0,1] to confidence
 
@@ -296,7 +314,7 @@ class PredictionAgent(BaseAgent):
             if existing:
                 continue
 
-            self.db.add(FactPrediction(
+            values = dict(
                 stock_id=stock_id,
                 date_id=date_id,
                 prediction_date=target,
@@ -304,10 +322,12 @@ class PredictionAgent(BaseAgent):
                 predicted_direction=direction,
                 predicted_score=round(score, 3),
                 predicted_confidence=round(max(0.5, probability), 3),
-                model_version="sentiment-fallback-v1.0",
+                model_version="sent-fallback-v1.0",
                 feature_importance={"combined_score": round(score, 4)},
-            ))
+            )
+            require_record("prediction", PredictionWrite, values)
+            self.db.add(FactPrediction(**values))
             count += 1
 
         self.db.commit()
-        return {"predictions_generated": count, "mode": "fallback", "target_date": str(target)}
+        return _prediction_summary(target, count, "fallback")

@@ -21,7 +21,12 @@ still require separate transaction work. BaseAgent now rejects execution payload
 that supply reserved run metadata, separates contract violations from execution
 failures, and records bounded error codes. The offline suite has 241 passes,
 42 PostgreSQL skips, six download-calling cases deselected and 63.56% coverage.
-Run correlation, real-agent contracts, concurrency and read models follow.
+The API worker now loads its active run before execution and passes the saved ID
+and date to all stages. It rejects foreign stage IDs and mismatched results.
+The socket-free ASGI tests exercise configured-key denial and a permitted trigger
+with mocked sessions and stages. The latest offline run passed 248 tests, skipped
+42 PostgreSQL tests, deselected six download-calling cases and reached 65.56%
+coverage. Real-agent contracts, concurrent admission and run-specific reads follow.
 
 ## Completed SN01-A foundations (4 November 2026)
 

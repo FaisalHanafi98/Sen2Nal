@@ -12,6 +12,7 @@ Can be triggered via:
 
 import logging
 import math
+import re
 from time import perf_counter
 import uuid
 from datetime import date
@@ -33,6 +34,8 @@ def run_full_pipeline(
     db: Session,
     target_date: date | None = None,
     tickers: list[str] | None = None,
+    *,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute the complete Sen2Nal pipeline.
 
@@ -40,11 +43,15 @@ def run_full_pipeline(
         db: SQLAlchemy session
         target_date: Date to process (default: today)
         tickers: List of ticker symbols (default: TOP_10)
+        run_id: Existing persisted run identity when called by the API worker.
 
     Returns:
         Dict with results from each agent stage
     """
-    run_id = f"pipeline_{uuid.uuid4().hex[:8]}"
+    if run_id is None:
+        run_id = f"pipeline_{uuid.uuid4().hex}"
+    elif not re.fullmatch(r"[A-Za-z0-9_-]{1,50}", run_id):
+        raise ValueError("Invalid pipeline run identifier")
     target = target_date or date.today()
 
     if tickers:
@@ -73,6 +80,9 @@ def run_full_pipeline(
             if not isinstance(status, str) or status not in {"success", "failed", "invalid", "partial"}:
                 result = {"status": "invalid", "error_code": "invalid_stage_status",
                           "error": "Stage returned an invalid result envelope"}
+            elif "run_id" in payload and payload["run_id"] != run_id:
+                result = {"status": "invalid", "error_code": "stage_run_id_mismatch",
+                          "error": "Stage result belongs to another run"}
             elif status == "success" and payload.get("error") not in (None, ""):
                 result = {"status": "invalid", "error_code": "stage_error_on_success",
                           "error": "Stage reported an error alongside success"}
@@ -90,6 +100,7 @@ def run_full_pipeline(
                       "elapsed_seconds": perf_counter() - started}
         else:
             result["elapsed_seconds"] = float(elapsed)
+        result["run_id"] = run_id
         if result["status"] != "success":
             logger.warning("[%s] Stage %s returned %s", run_id, name, result["status"])
             db.rollback()

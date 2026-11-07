@@ -1,5 +1,6 @@
 """Pipeline monitoring and control endpoints."""
 
+import logging
 from datetime import datetime
 from typing import Any, cast
 
@@ -19,6 +20,8 @@ from src.database.models import (
     StgNewsRaw,
     StgRedditRaw,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def verify_pipeline_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -138,7 +141,7 @@ def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(ge
     """Trigger a full pipeline run in the background."""
     import uuid
 
-    run_id = f"pipeline_{uuid.uuid4().hex[:8]}"
+    run_id = f"pipeline_{uuid.uuid4().hex}"
 
     pipeline_run = PipelineRun(
         run_id=run_id,
@@ -153,54 +156,54 @@ def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(ge
     return {"status": "started", "run_id": run_id, "message": "Pipeline run started in background"}
 
 
-async def _run_pipeline_background(run_id: str):
+async def _run_pipeline_background(run_id: str) -> None:
     """Background task wrapper for pipeline execution."""
     from src.pipeline.runner import run_full_pipeline
     from src.database.connection import SessionLocal
 
     db = SessionLocal()
+    query = select(PipelineRun).where(PipelineRun.run_id == run_id)
     try:
-        result = run_full_pipeline(db)
+        record = cast(Any, db.execute(query).scalar_one_or_none())
+        if record is None or record.status != "running":
+            return
 
-        # Update pipeline run record
-        pipeline_run = db.execute(
-            select(PipelineRun).where(PipelineRun.run_id == run_id)
-        ).scalar_one_or_none()
+        target = record.target_date
+        result = run_full_pipeline(db, target_date=target, run_id=run_id)
+        if (result.get("run_id") != run_id or result.get("target_date") != target.isoformat()
+                or result.get("overall_status") not in ("success", "failed")):
+            raise ValueError("Pipeline result did not match the saved run")
 
-        if pipeline_run:
-            pipeline_run_record = cast(Any, pipeline_run)
-            pipeline_run_record.status = result.get("overall_status", "unknown")
-            pipeline_run_record.finished_at = datetime.utcnow()
-            pipeline_run_record.result_json = result
-
-            # Write stage results as log entries
-            for stage_name, stage_data in result.get("stages", {}).items():
-                status = stage_data.get("status", "unknown")
-                elapsed = stage_data.get("elapsed_seconds", 0)
-                level = "success" if status == "success" else "error"
-                db.add(PipelineLog(
-                    run_id=pipeline_run_record.id,
-                    stage=stage_name,
-                    level=level,
-                    message=f"{stage_name} {status} ({elapsed:.1f}s)",
-                ))
-
-            db.commit()
-    except Exception as e:
-        pipeline_run = db.execute(
-            select(PipelineRun).where(PipelineRun.run_id == run_id)
-        ).scalar_one_or_none()
-        if pipeline_run:
-            pipeline_run_record = cast(Any, pipeline_run)
-            pipeline_run_record.status = "failed"
-            pipeline_run_record.finished_at = datetime.utcnow()
-            pipeline_run_record.result_json = {"error": str(e)}
+        record.status = result["overall_status"]
+        record.finished_at = datetime.utcnow()
+        record.result_json = result
+        for stage_name, stage_data in result["stages"].items():
+            status = stage_data["status"]
+            elapsed = stage_data["elapsed_seconds"]
             db.add(PipelineLog(
-                run_id=pipeline_run_record.id,
-                stage="system",
-                level="error",
-                message=f"Pipeline crashed: {e}",
+                run_id=record.id,
+                stage=stage_name,
+                level="success" if status == "success" else "error",
+                message=f"{stage_name} {status} ({elapsed:.1f}s)",
             ))
-            db.commit()
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.error("Pipeline worker failed for run %s", run_id)
+        record = cast(Any, db.execute(query).scalar_one_or_none())
+        if record is None or record.status != "running":
+            return
+        record.status = "failed"
+        record.finished_at = datetime.utcnow()
+        record.result_json = {
+            "run_id": run_id,
+            "target_date": record.target_date.isoformat(),
+            "overall_status": "failed",
+            "error_code": "pipeline_worker_failed",
+            "stages": {},
+        }
+        db.add(PipelineLog(run_id=record.id, stage="system", level="error",
+                           message="Pipeline worker failed"))
+        db.commit()
     finally:
         db.close()

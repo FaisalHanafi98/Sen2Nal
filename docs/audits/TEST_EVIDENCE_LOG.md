@@ -313,3 +313,26 @@ deselected six download-calling cases in 4.91s. Coverage reached 63.56% against
 the 40% floor, with zero blocked connection attempts. Full Ruff and focused
 `python -m mypy src/agents/base.py --follow-imports=skip --ignore-missing-imports`
 passed. Agent commits before validation and real PostgreSQL remain open.
+
+## SN02.3 — Run identity through the API worker (8 November 2026)
+
+Starting revision `e8260c7`. The trigger creates an opaque run ID within the
+existing column limit. The worker fetches its active row before starting,
+passes its ID and target date to the runner, and checks the returned identity
+before storing the result and stage logs. The runner binds each stage result
+to the active ID. Worker errors roll back pending writes and store a bounded
+failure for an active row. Tests exercise the configured API key through ASGI.
+
+The Windows event loop socket conflicted with the offline guard. The final
+fixture drives HTTPX's in-memory ASGI transport directly and runs mocked sync
+I/O inline. With that fixture, five tests failed on the old implementation and
+the two denied-key controls passed. All seven pass after the fix. The offline
+suite passed 248 tests, skipped 42 PostgreSQL tests and deselected six
+download-calling cases in 4.48s. Coverage was 65.56% with zero blocked connection
+attempts. Ruff and focused mypy on the runner and pipeline router passed.
+
+Security review found the configured-key boundary preserved in the exercised
+path. The synthetic tests cover allowed and denied requests, mismatched identity,
+terminal or missing rows, safe error text and worker-session cleanup. Review
+remains open for PostgreSQL transactions, concurrent admission and worker
+scheduling. The worker still uses the existing asynchronous dispatch shape.

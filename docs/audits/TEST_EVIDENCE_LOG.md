@@ -394,3 +394,17 @@ Six focused assertions failed before the repair. The offline suite passed
 cases in 5.31s. Coverage was 68.66%. Ruff and focused mypy on both changed
 Python modules passed. Tests use synthetic scores and mocked sessions with
 zero blocked connection attempts. Durable PostgreSQL rollback remains open.
+
+## SN02.7 — Feature write validation (8 November 2026)
+
+Starting revision `d673516`. The feature agent validates the actual daily
+sentiment write payload before adding it. Existing decimal history and observed
+zero source scores retain their meaning. A failure on a later ticker aborts the
+stage and requests rollback of pending writes. Successful stages distinguish
+zero new records from a populated write batch.
+
+Six focused assertions failed before repair. The offline suite passed 270 tests,
+skipped 42 PostgreSQL cases and deselected six download-calling cases in 5.30s.
+Coverage was 71.17%, with zero blocked connection attempts. Ruff and focused
+mypy passed. Tests use the real feature agent with mocked reads and sessions.
+PostgreSQL transaction verification remains open.

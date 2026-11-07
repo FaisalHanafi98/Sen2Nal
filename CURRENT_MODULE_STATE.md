@@ -36,8 +36,10 @@ library modules required by tracked imports, and its exported import graph bundl
 Sentiment now validates score cardinality, ranges and model identity before
 mutating each batch. It reports empty and present batches explicitly and rolls
 back pending work when validation fails. The offline suite passed 264 tests with
-68.66% coverage. Feature, ingestion and prediction record gates and concurrent
-admission remain open.
+68.66% coverage. Feature records now pass a write contract before they are added.
+A later ticker failure rolls back pending feature writes. Observed zero scores
+stay distinct from missing scores. The offline suite passed 270 tests with 71.17%
+coverage. Ingestion and prediction record gates and concurrent admission remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

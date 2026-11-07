@@ -9,7 +9,7 @@ Combines NLP sentiment, calendar signals, and market data into feature vectors.
 """
 
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 
@@ -18,6 +18,8 @@ from src.agents.calendar import CalendarAgent
 from src.agents.sentiment import aggregate_ticker_sentiment
 from src.config import settings
 from src.constants import SIGNAL_THRESHOLDS, SignalType
+from src.contracts.features import FeatureWrite
+from src.data_quality.validator import require_record
 from src.database.models import (
     DimCalendar,
     DimStock,
@@ -56,16 +58,13 @@ class FeatureAgent(BaseAgent):
 
         rows_written = 0
         for ticker in ticker_list:
-            try:
-                written = self._build_features(ticker, target, date_id,
-                                               calendar_signals.get(ticker, {}))
-                if written:
-                    rows_written += 1
-            except Exception as e:
-                self.logger.warning(f"Feature build failed for {ticker}: {e}")
+            if self._build_features(ticker, target, date_id, calendar_signals.get(ticker, {})):
+                rows_written += 1
 
         self.db.commit()
-        return {"target_date": str(target), "rows_written": rows_written}
+        return {"target_date": str(target), "rows_written": rows_written,
+                "records_validated": rows_written,
+                "data_state": "present" if rows_written else "empty"}
 
     def _build_features(self, ticker: str, target: date, date_id: int,
                         cal_signal: dict) -> bool:
@@ -131,7 +130,7 @@ class FeatureAgent(BaseAgent):
             elif nlp_momentum < 0:
                 nlp_trend_days = min(0, prev_trend) - 1
 
-        self.db.add(FactSentiment(
+        values = dict(
             stock_id=stock_id,
             date_id=date_id,
             nlp_score=round(nlp["nlp_score"], 4),
@@ -139,9 +138,9 @@ class FeatureAgent(BaseAgent):
             nlp_momentum=nlp_momentum,
             nlp_trend_days=nlp_trend_days,
             nlp_confidence=round(nlp["nlp_confidence"], 4),
-            news_score=round(nlp["news_score"], 4) if nlp["news_score"] else None,
+            news_score=round(nlp["news_score"], 4) if nlp["news_score"] is not None else None,
             news_count=nlp["news_count"],
-            reddit_score=round(nlp["reddit_score"], 4) if nlp["reddit_score"] else None,
+            reddit_score=round(nlp["reddit_score"], 4) if nlp["reddit_score"] is not None else None,
             reddit_count=nlp["reddit_count"],
             calendar_score=round(calendar_score, 4),
             month_avg_return=round(month_avg_return, 4),
@@ -153,7 +152,9 @@ class FeatureAgent(BaseAgent):
             conflict_flag=conflict_flag,
             conflict_reason=conflict_reason,
             pipeline_run_id=self.run_id,
-        ))
+        )
+        require_record("features", FeatureWrite, values)
+        self.db.add(FactSentiment(**values))
         self.db.flush()
         return True
 
@@ -199,9 +200,9 @@ class FeatureAgent(BaseAgent):
         }
 
     def _get_date_id(self, target: date) -> int | None:
-        return self.db.execute(
+        return cast(int | None, self.db.execute(
             select(DimCalendar.date_id).where(DimCalendar.date == target)
-        ).scalar()
+        ).scalar())
 
 
 def _classify_signal(combined_score: float) -> str:

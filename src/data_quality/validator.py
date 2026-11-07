@@ -33,6 +33,16 @@ STAGE_CONTRACTS: dict[str, type[BaseModel]] = {
 }
 
 
+def require_record(stage: str, contract: type[BaseModel], record: dict[str, Any]) -> None:
+    """Validate the supplied write payload and report only safe field diagnostics."""
+    try:
+        contract.model_validate(record)
+    except ValidationError as exc:
+        details = [{"type": error["type"], "loc": error["loc"]}
+                   for error in exc.errors(include_input=False, include_context=False)]
+        raise DataContractViolation(stage, details) from exc
+
+
 @dataclass
 class StageError:
     """A single record validation failure."""

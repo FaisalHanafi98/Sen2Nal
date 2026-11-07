@@ -5,6 +5,7 @@ No real model downloads or GPU inference in tests.
 """
 
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -190,3 +191,79 @@ class TestProcessStaging:
         agent.db.execute.return_value.scalars.return_value.all.return_value = []
         count = agent._process_reddit()
         assert count == 0
+
+    @pytest.mark.parametrize("scores", [[], [(float("nan"), 0.5)], [(0.2, 1.1)], [(0.2,)]])
+    def test_invalid_score_batch_leaves_news_unprocessed(self, agent, monkeypatch, scores):
+        record = SimpleNamespace(headline="Synthetic news", summary="Example",
+                                 is_processed=False, sentiment_score=None)
+        agent._model = MagicMock()
+        agent._model_type = "vader"
+        news_read, empty_read = MagicMock(), MagicMock()
+        news_read.scalars.return_value.all.return_value = [record]
+        empty_read.scalars.return_value.all.return_value = []
+        agent.db.execute.side_effect = [news_read, empty_read]
+        monkeypatch.setattr(agent, "_score_batch", lambda texts: scores)
+
+        result = agent.run()
+
+        assert result["status"] == "invalid"
+        assert result["error_code"] == "data_contract_violation"
+        assert record.is_processed is False and record.sentiment_score is None
+        agent.db.flush.assert_not_called()
+        agent.db.commit.assert_not_called()
+        agent.db.rollback.assert_called_once()
+
+    def test_validated_scores_commit_and_report_source_counts(self, agent, monkeypatch):
+        news = SimpleNamespace(headline="Synthetic news", summary="Example", is_processed=False)
+        post = SimpleNamespace(title="Synthetic post", body="Example", is_processed=False)
+        agent._model = MagicMock()
+        agent._model_type = "vader"
+        reads = [MagicMock(), MagicMock()]
+        reads[0].scalars.return_value.all.return_value = [news]
+        reads[1].scalars.return_value.all.return_value = [post]
+        agent.db.execute.side_effect = reads
+        monkeypatch.setattr(agent, "_score_batch", MagicMock(side_effect=[[(0.4, 0.8)], [(-0.6, 0.9)]]))
+
+        result = agent.run()
+
+        assert result["status"] == "success"
+        assert (result["news_processed"], result["reddit_processed"], result["records_validated"]) == (1, 1, 2)
+        assert result["data_state"] == "present"
+        assert result["model_used"] == "vader"
+        assert news.is_processed and news.sentiment_score == 0.4
+        assert post.is_processed and post.sentiment_score == -0.6
+        agent.db.commit.assert_called_once()
+        agent.db.rollback.assert_not_called()
+
+    def test_empty_selection_is_a_valid_empty_batch(self, agent, monkeypatch):
+        agent._model = MagicMock()
+        agent._model_type = "vader"
+        agent.db.execute.return_value.scalars.return_value.all.return_value = []
+        scorer = MagicMock()
+        monkeypatch.setattr(agent, "_score_batch", scorer)
+
+        result = agent.run()
+
+        assert result["status"] == "success"
+        assert result["data_state"] == "empty"
+        assert result["records_validated"] == 0
+        assert result["model_used"] is None
+        scorer.assert_not_called()
+        agent.db.flush.assert_not_called()
+
+    def test_invalid_reddit_scores_roll_back_pending_news_work(self, agent, monkeypatch):
+        news = SimpleNamespace(headline="Synthetic news", summary="Example")
+        post = SimpleNamespace(title="Synthetic post", body="Example", is_processed=False)
+        agent._model = MagicMock()
+        agent._model_type = "vader"
+        reads = [MagicMock(), MagicMock()]
+        reads[0].scalars.return_value.all.return_value = [news]
+        reads[1].scalars.return_value.all.return_value = [post]
+        agent.db.execute.side_effect = reads
+        monkeypatch.setattr(agent, "_score_batch", MagicMock(side_effect=[[(0.4, 0.8)], []]))
+
+        assert agent.run()["status"] == "invalid"
+        assert post.is_processed is False
+        agent.db.flush.assert_called_once()
+        agent.db.commit.assert_not_called()
+        agent.db.rollback.assert_called_once()

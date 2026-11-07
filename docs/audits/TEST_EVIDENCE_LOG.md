@@ -379,3 +379,18 @@ frontend exception and the three reviewed modules produce a passing bundle from
 the staged export with the installed dependency tree. The synthetic nested Python
 `lib/` check remains ignored. This verifies source availability and import
 resolution. The worktree Vite build is recorded in SN02.5.
+
+## SN02.6 — Sentiment batch validation (8 November 2026)
+
+Starting revision `7c02e58`. The real SentimentAgent validates one score pair per
+selected input and checks score, confidence, model kind and timestamp through
+the sentiment contract. Each batch is validated before any of its rows are
+mutated. A later Reddit failure rolls back pending news work before the stage
+commit. The summary records the validated count, actual scorer kind and an
+explicit empty state.
+
+Six focused assertions failed before the repair. The offline suite passed
+264 tests, skipped 42 PostgreSQL cases and deselected six download-calling
+cases in 5.31s. Coverage was 68.66%. Ruff and focused mypy on both changed
+Python modules passed. Tests use synthetic scores and mocked sessions with
+zero blocked connection attempts. Durable PostgreSQL rollback remains open.

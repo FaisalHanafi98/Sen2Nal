@@ -13,11 +13,14 @@ import math
 from datetime import datetime
 from typing import Any, cast
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.agents.base import BaseAgent
 from src.config import settings
+from src.contracts.base import DataContractViolation
+from src.contracts.sentiment import SentimentScore
 from src.database.models import StgNewsRaw, StgRedditRaw
 
 logger = logging.getLogger(__name__)
@@ -51,9 +54,13 @@ class SentimentAgent(BaseAgent):
         reddit_count = self._process_reddit()
 
         self.db.commit()
+        count = news_count + reddit_count
         return {
             "news_processed": news_count,
             "reddit_processed": reddit_count,
+            "records_validated": count,
+            "data_state": "present" if count else "empty",
+            "model_used": self._model_type if count else None,
         }
 
     # =========================================================================
@@ -187,6 +194,27 @@ class SentimentAgent(BaseAgent):
     # Process staging tables
     # =========================================================================
 
+    def _validated_score_batch(self, texts: list[str]) -> list[SentimentScore]:
+        scores = self._score_batch(texts)
+        if not isinstance(scores, list) or len(scores) != len(texts):
+            raise DataContractViolation("sentiment", [{"type": "score_batch_size"}])
+
+        processed_at = datetime.utcnow()
+        validated = []
+        for index, score in enumerate(scores):
+            if not isinstance(score, tuple) or len(score) != 2:
+                raise DataContractViolation("sentiment", [{"type": "score_pair", "index": index}])
+            try:
+                validated.append(SentimentScore.model_validate({
+                    "sentiment_score": score[0], "confidence": score[1],
+                    "model_used": self._model_type, "processing_timestamp": processed_at,
+                }))
+            except ValidationError as exc:
+                details = [{"type": error["type"], "loc": error["loc"], "index": index}
+                           for error in exc.errors(include_input=False, include_context=False)]
+                raise DataContractViolation("sentiment", details) from exc
+        return validated
+
     def _process_news(self) -> int:
         """Score unprocessed news articles and update staging records."""
         unprocessed = self.db.execute(
@@ -198,15 +226,14 @@ class SentimentAgent(BaseAgent):
             return 0
 
         texts = [f"{r.headline}. {r.summary or ''}" for r in unprocessed]
-        scores = self._score_batch(texts)
+        scores = self._validated_score_batch(texts)
 
-        now = datetime.utcnow()
-        for record, (score, confidence) in zip(unprocessed, scores):
+        for record, score in zip(unprocessed, scores, strict=True):
             record_any = cast(Any, record)
-            record_any.sentiment_score = score
-            record_any.sentiment_label = _classify_sentiment(score)
+            record_any.sentiment_score = score.sentiment_score
+            record_any.sentiment_label = _classify_sentiment(score.sentiment_score)
             record_any.is_processed = True
-            record_any.processed_at = now
+            record_any.processed_at = score.processing_timestamp
 
         self.db.flush()
         self.logger.info(f"Scored {len(unprocessed)} news articles")
@@ -223,15 +250,14 @@ class SentimentAgent(BaseAgent):
             return 0
 
         texts = [f"{r.title or ''}. {r.body or ''}" for r in unprocessed]
-        scores = self._score_batch(texts)
+        scores = self._validated_score_batch(texts)
 
-        now = datetime.utcnow()
-        for record, (score, confidence) in zip(unprocessed, scores):
+        for record, score in zip(unprocessed, scores, strict=True):
             record_any = cast(Any, record)
-            record_any.sentiment_score = score
-            record_any.sentiment_label = _classify_sentiment(score)
+            record_any.sentiment_score = score.sentiment_score
+            record_any.sentiment_label = _classify_sentiment(score.sentiment_score)
             record_any.is_processed = True
-            record_any.processed_at = now
+            record_any.processed_at = score.processing_timestamp
 
         self.db.flush()
         self.logger.info(f"Scored {len(unprocessed)} Reddit posts")

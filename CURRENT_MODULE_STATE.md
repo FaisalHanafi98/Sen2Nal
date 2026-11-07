@@ -33,7 +33,11 @@ this slice passed 257 tests with 66.86% coverage. The dashboard displays the sav
 run state, includes calendar status and labels sample mode. Static React rendering,
 the Vite build and lint passed. The Git index now includes the three frontend
 library modules required by tracked imports, and its exported import graph bundles.
-Real-agent contracts and concurrent admission follow.
+Sentiment now validates score cardinality, ranges and model identity before
+mutating each batch. It reports empty and present batches explicitly and rolls
+back pending work when validation fails. The offline suite passed 264 tests with
+68.66% coverage. Feature, ingestion and prediction record gates and concurrent
+admission remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

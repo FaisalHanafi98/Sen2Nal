@@ -122,8 +122,8 @@ class TestInvalidOutputRaises:
         }]
         agent = _make_validated_agent(MagicMock(), "sentiment", records)
         result = agent.run()
-        # DataContractViolation is caught by run() and turned into failed status
-        assert result["status"] == "failed"
+        assert result["status"] == "invalid"
+        assert result["error_code"] == "data_contract_violation"
         assert "validation error" in result["error"].lower()
 
     def test_ingestion_missing_field_fails(self):
@@ -135,7 +135,7 @@ class TestInvalidOutputRaises:
         }]
         agent = _make_validated_agent(MagicMock(), "ingestion", records)
         result = agent.run()
-        assert result["status"] == "failed"
+        assert result["status"] == "invalid"
 
     def test_calendar_score_out_of_bounds_fails(self):
         records = [{
@@ -151,7 +151,7 @@ class TestInvalidOutputRaises:
         }]
         agent = _make_validated_agent(MagicMock(), "calendar", records)
         result = agent.run()
-        assert result["status"] == "failed"
+        assert result["status"] == "invalid"
 
 
 # -- Test: pipeline halts on contract violation ------------------------------

@@ -297,4 +297,19 @@ exception redaction, finite numeric durations and non-critical experiment handli
 All stages and sessions were mocks; no actual pipeline, provider or database ran.
 Rollback cannot undo earlier agent commits. Pre-persistence contracts, validated
 empty/partial data handling, run correlation, concurrent admission and read-model
-truth remain open. Next is BaseAgent-owned metadata/error-payload integrity.
+truth remain open.
+
+## SN02.2 — BaseAgent result ownership (8 November 2026)
+
+Starting revision `cefc3f8`. BaseAgent owns status, agent identity, run ID, elapsed
+time and error code. Malformed or reserved-metadata payloads are invalid. An
+execution error is failed and a data contract violation is invalid. Exceptions
+and execution error payloads use bounded messages in results and logs. Duration
+comes from a monotonic clock. The tests use mocked sessions.
+
+The targeted red run reproduced 11 metadata, classification and redaction failures.
+The offline regression run passed 241 tests, skipped 42 PostgreSQL tests and
+deselected six download-calling cases in 4.91s. Coverage reached 63.56% against
+the 40% floor, with zero blocked connection attempts. Full Ruff and focused
+`python -m mypy src/agents/base.py --follow-imports=skip --ignore-missing-imports`
+passed. Agent commits before validation and real PostgreSQL remain open.

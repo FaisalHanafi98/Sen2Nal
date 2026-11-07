@@ -3,10 +3,15 @@
 import logging
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime
+from time import perf_counter
 from typing import Any
 
 from sqlalchemy.orm import Session
+
+from src.contracts.base import DataContractViolation
+
+
+_RUN_METADATA = frozenset({"status", "agent", "run_id", "elapsed_seconds", "error_code"})
 
 
 class BaseAgent(ABC):
@@ -25,7 +30,6 @@ class BaseAgent(ABC):
         self.db = db
         self.run_id = run_id or f"run_{uuid.uuid4().hex[:12]}"
         self.logger = logging.getLogger(f"sen2nal.{self.name}")
-        self._start_time: datetime | None = None
 
     @property
     @abstractmethod
@@ -63,7 +67,6 @@ class BaseAgent(ABC):
             self.logger.error(
                 f"[{self.run_id}] {self.name} output validation FAILED: {validation.summary()}"
             )
-            from src.contracts.base import DataContractViolation
             error_details = [
                 {"index": e.index, "errors": e.errors} for e in validation.errors
             ]
@@ -75,18 +78,32 @@ class BaseAgent(ABC):
 
     def run(self, **kwargs: Any) -> dict[str, Any]:
         """Execute with logging, validation, and error handling wrapper."""
-        self._start_time = datetime.utcnow()
+        started = perf_counter()
         self.logger.info(f"[{self.run_id}] Starting {self.name}")
+        result: dict[str, Any]
         try:
-            result = self.execute(**kwargs)
-            self._validate_output(result)
-            elapsed = (datetime.utcnow() - self._start_time).total_seconds()
-            self.logger.info(f"[{self.run_id}] {self.name} completed in {elapsed:.1f}s")
-            return {"status": "success", "agent": self.name, "run_id": self.run_id,
-                    "elapsed_seconds": elapsed, **result}
-        except Exception as e:
-            elapsed = (datetime.utcnow() - self._start_time).total_seconds()
-            self.logger.error(f"[{self.run_id}] {self.name} failed after {elapsed:.1f}s: {e}")
+            payload = self.execute(**kwargs)
+            if not isinstance(payload, dict) or _RUN_METADATA.intersection(payload):
+                result = {"status": "invalid", "error_code": "invalid_stage_payload",
+                          "error": "Stage returned an invalid execution payload"}
+            elif payload.get("error") not in (None, ""):
+                result = {"status": "failed", "error_code": "stage_execution_error",
+                          "error": "Stage reported an execution error"}
+            else:
+                self._validate_output(payload)
+                result = {**payload, "status": "success"}
+        except DataContractViolation:
+            result = {"status": "invalid", "error_code": "data_contract_violation",
+                      "error": "Stage output contains validation errors"}
+        except Exception:
+            result = {"status": "failed", "error_code": "stage_exception",
+                      "error": "Stage execution failed"}
+
+        elapsed = perf_counter() - started
+        if result["status"] == "success":
+            self.logger.info("[%s] %s completed in %.1fs", self.run_id, self.name, elapsed)
+        else:
+            self.logger.error("[%s] %s returned %s after %.1fs (%s)", self.run_id,
+                              self.name, result["status"], elapsed, result["error_code"])
             self.db.rollback()
-            return {"status": "failed", "agent": self.name, "run_id": self.run_id,
-                    "elapsed_seconds": elapsed, "error": str(e)}
+        return {**result, "agent": self.name, "run_id": self.run_id, "elapsed_seconds": elapsed}

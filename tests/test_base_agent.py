@@ -3,6 +3,8 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.agents.base import BaseAgent
 
 
@@ -44,12 +46,36 @@ class TestRunWrapper:
         assert result["count"] == 5
         assert "elapsed_seconds" in result
 
-    def test_failure_catches_exception(self):
+    def test_failure_catches_exception_without_exposing_its_message(self, caplog):
         agent = ConcreteAgent(MagicMock(), "run_2", error=RuntimeError("boom"))
         result = agent.run()
         assert result["status"] == "failed"
-        assert result["error"] == "boom"
+        assert result["error_code"] == "stage_exception"
+        assert "boom" not in str(result)
+        assert "boom" not in caplog.text
         assert result["agent"] == "TestAgent"
+
+    @pytest.mark.parametrize("payload", [
+        {"status": "success"}, {"agent": "other"}, {"run_id": "another-run"},
+        {"elapsed_seconds": 0}, {"error_code": "forged"}, ["malformed"],
+    ])
+    def test_execute_cannot_supply_runner_metadata(self, payload):
+        db = MagicMock()
+        result = ConcreteAgent(db, "owned-run", result=payload).run()
+        assert result["status"] == "invalid"
+        assert result["error_code"] == "invalid_stage_payload"
+        assert result["run_id"] == "owned-run"
+        assert result["agent"] == "TestAgent"
+        db.rollback.assert_called_once()
+
+    def test_execution_error_payload_is_a_failure(self, caplog):
+        db = MagicMock()
+        result = ConcreteAgent(db, result={"error": "private input detail", "count": 0}).run()
+        assert result["status"] == "failed"
+        assert result["error_code"] == "stage_execution_error"
+        assert "private input detail" not in str(result)
+        assert "private input detail" not in caplog.text
+        db.rollback.assert_called_once()
 
     def test_failure_rolls_back_session(self):
         db = MagicMock()

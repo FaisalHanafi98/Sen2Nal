@@ -17,9 +17,11 @@ All 44 new run-integrity cases pass. The offline regression suite has 234 passes
 42 PostgreSQL skips, 6 download-calling tests deselected and 63.44% coverage.
 Ruff and focused runner typing pass. Full typing remains unverified.
 Tests exercise mocked stages and sessions. Agent commits made before validation
-still require separate transaction work. The next slice protects BaseAgent
-metadata and handles error-bearing payloads. Run correlation, real-agent contracts,
-concurrency and read models follow.
+still require separate transaction work. BaseAgent now rejects execution payloads
+that supply reserved run metadata, separates contract violations from execution
+failures, and records bounded error codes. The offline suite has 241 passes,
+42 PostgreSQL skips, six download-calling cases deselected and 63.56% coverage.
+Run correlation, real-agent contracts, concurrency and read models follow.
 
 ## Completed SN01-A foundations (4 November 2026)
 

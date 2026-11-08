@@ -80,6 +80,19 @@ pool. The offline suite passed 321 tests with 78.95% coverage. Committed
 stages retain their rows if a later stage fails. Only pending stage writes
 roll back, and the saved run records the failure.
 
+## Local sentiment verification (8 November 2026)
+
+VADER scoring tests use the installed lexicon or report a skip. Short-input
+tests are independent of the lexicon. The guarded suite ran without
+deselections and passed 328 tests with 79.34% coverage. Full mypy timed out
+after 75 seconds. Focused checks for the changed backend files are recorded
+with each slice.
+
+The default cache had a VADER lexicon, but no FinBERT snapshot was found.
+The local VADER analyser was measured with synthetic text. The exact FinBERT
+revision, tokenizer, weights and rights are still open, and the runtime
+loader has not been changed. See the test evidence log for scope and results.
+
 ## Completed SN01-A foundations (4 November 2026)
 
 The owner authorised continued implementation after SN-BASE. Starting revision:

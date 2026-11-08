@@ -578,3 +578,31 @@ with zero blocked connection attempts. Ruff and focused mypy with skipped
 imports passed. Real request responsiveness and native transactions remain
 unverified. A failed stage rolls back its pending writes. Earlier stage
 commits survive and are recorded in the failed run report.
+
+## SN03-A — Offline VADER verification and asset inventory (8 November 2026)
+
+Starting revision `32c1c19`. The VADER test fixture attempted a download
+even when a lexicon was installed. The regression replaces the downloader
+with a failing stub and verifies an explicit skip when the local lexicon
+is absent. Empty and short text tests do not require the asset.
+
+The guarded backend suite ran without deselections. It passed 328 tests
+and skipped 43 PostgreSQL cases in 13.71s. Coverage was 79.34%, with zero
+blocked connection attempts. Ruff passed. Full mypy timed out at 75 seconds.
+
+The local Windows Python 3.11.9 environment has NLTK 3.9.2, Transformers
+4.57.3, Tokenizers 0.22.2, Hugging Face Hub 0.36.0 and Torch 2.9.1. The
+pre-existing VADER archive in the roaming NLTK cache is 90,486 bytes, with
+SHA-256 `8adba4294eef3964d820bf655e37e61bdc3a341994356af59b74fb3b4a36ce5c`.
+In one process the standalone VADER analyser took 4,107.1 ms to import and
+load. Median time across 20 warm batches of 16 synthetic texts was 1.80 ms.
+The peak working set was 154.7 MiB, including imports. The check blocked
+socket connections and disabled the downloader. These measurements cover
+the standalone analyser, separate from the pipeline's fallback path.
+
+The configured FinBERT default is `ProsusAI/finbert`. No snapshot was found
+in the default Hugging Face cache and no cache overrides were set in the
+shell. Exact revision, tokenizer and weight files, rights and FinBERT runtime
+measurements still require an authorised local snapshot. The production
+loader still has download-capable paths. No assets were copied or downloaded
+for this check.

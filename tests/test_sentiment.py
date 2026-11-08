@@ -1,6 +1,6 @@
 """Tests for AG-02 Sentiment Agent.
 
-Tests sentiment scoring with mocked FinBERT/VADER models.
+Tests sentiment scoring with mocked models and an optional local VADER lexicon.
 No real model downloads or GPU inference in tests.
 """
 
@@ -37,6 +37,22 @@ class TestSentimentAttributes:
 
 # -- VADER fallback scoring -------------------------------------------------
 
+def test_missing_vader_lexicon_skips_without_downloading(monkeypatch):
+    import nltk
+    from nltk.sentiment import vader
+
+    def missing_lexicon():
+        raise LookupError("Fixture lexicon unavailable")
+
+    def unexpected_download(*args, **kwargs):
+        pytest.fail("VADER tests must use a local lexicon")
+
+    monkeypatch.setattr(vader, "SentimentIntensityAnalyzer", missing_lexicon)
+    monkeypatch.setattr(nltk, "download", unexpected_download)
+    with pytest.raises(pytest.skip.Exception, match="Local VADER lexicon"):
+        TestVaderFallback()._make_vader_agent()
+
+
 class TestVaderFallback:
 
     def _make_vader_agent(self):
@@ -45,9 +61,10 @@ class TestVaderFallback:
         agent = SentimentAgent(db=db, run_id="test_vader")
         # Force VADER mode
         from nltk.sentiment.vader import SentimentIntensityAnalyzer
-        import nltk
-        nltk.download("vader_lexicon", quiet=True)
-        agent._model = SentimentIntensityAnalyzer()
+        try:
+            agent._model = SentimentIntensityAnalyzer()
+        except LookupError:
+            pytest.skip("Local VADER lexicon unavailable")
         agent._model_type = "vader"
         return agent
 
@@ -74,14 +91,12 @@ class TestVaderFallback:
         )
         assert -0.5 <= score <= 0.5
 
-    def test_empty_text_returns_zero(self):
-        agent = self._make_vader_agent()
+    def test_empty_text_returns_zero(self, agent):
         score, confidence = agent._score_text("")
         assert score == 0.0
         assert confidence == 0.0
 
-    def test_short_text_returns_zero(self):
-        agent = self._make_vader_agent()
+    def test_short_text_returns_zero(self, agent):
         score, confidence = agent._score_text("hi")
         assert score == 0.0
         assert confidence == 0.0

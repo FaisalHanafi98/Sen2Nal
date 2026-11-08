@@ -50,7 +50,9 @@ The calendar stage now validates its computed records with the original date
 before serialising the summary. The offline suite passed 303 tests with 78.21%
 coverage. The legacy calendar still uses approximations. Live provider
 compatibility, source timestamps, availability reporting and concurrent
-admission remain open.
+admission remain open. The runner now rejects an explicitly empty selection
+and passes distinct allowed tickers to the stages in request order. The offline
+suite passed 306 tests with 78.39% coverage.
 
 ## Completed SN01-A foundations (4 November 2026)
 

@@ -466,3 +466,14 @@ tests, skipped 42 PostgreSQL cases and deselected six download-calling cases
 in 7.08s. Coverage was 78.21%, with zero blocked connection attempts. Ruff and
 focused mypy with skipped imports passed. The calendar features still use
 local estimates for holidays, trading days and earnings proximity.
+
+## SN02.12 — Explicit ticker selection (8 November 2026)
+
+Starting revision `0716212`. An explicit selection with no allowed tickers
+fails validation before any stage starts. Repeated allowed tickers are passed
+once, in request order. An omitted selection still uses the legacy default.
+
+Two focused assertions failed before repair. The offline suite passed 306 tests,
+skipped 42 PostgreSQL cases and deselected six download-calling cases in 6.58s.
+Coverage was 78.39%, with zero blocked connection attempts. Ruff and focused
+mypy with skipped imports passed.

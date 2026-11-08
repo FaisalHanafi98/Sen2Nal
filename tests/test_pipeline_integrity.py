@@ -101,6 +101,25 @@ def test_explicit_success_with_empty_records_is_not_a_malformed_envelope(stages)
     assert result["stages"]["ingestion"]["elapsed_seconds"] == 0.0
 
 
+@pytest.mark.parametrize("tickers", [[], ["FIXTURE_UNKNOWN"]])
+def test_explicit_request_with_no_allowed_tickers_never_runs_a_stage(stages, tickers):
+    result = runner.run_full_pipeline(MagicMock(), date(2026, 11, 4), tickers=tickers)
+    assert result["overall_status"] == "failed"
+    assert result["failed_at"] == "validation"
+    assert result["stages"] == {}
+    for constructor in stages:
+        constructor.assert_not_called()
+
+
+def test_runner_preserves_first_seen_order_of_distinct_allowed_tickers(stages):
+    day = date(2026, 11, 4)
+    result = runner.run_full_pipeline(
+        MagicMock(), day, tickers=["MSFT", "FIXTURE_UNKNOWN", "AAPL", "MSFT"],
+    )
+    assert result["overall_status"] == "success"
+    stages[0].return_value.run.assert_called_once_with(target_date=day, tickers=["MSFT", "AAPL"])
+
+
 @pytest.fixture
 def pipeline_client(monkeypatch):
     app = FastAPI()

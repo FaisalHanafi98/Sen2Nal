@@ -42,7 +42,7 @@ def run_full_pipeline(
     Args:
         db: SQLAlchemy session
         target_date: Date to process (default: today)
-        tickers: List of ticker symbols (default: TOP_10)
+        tickers: Requested ticker symbols. None uses the legacy default.
         run_id: Existing persisted run identity when called by the API worker.
 
     Returns:
@@ -54,9 +54,9 @@ def run_full_pipeline(
         raise ValueError("Invalid pipeline run identifier")
     target = target_date or date.today()
 
-    if tickers:
+    if tickers is not None:
         from src.constants import validate_tickers
-        tickers = validate_tickers(tickers)
+        tickers = list(dict.fromkeys(validate_tickers(tickers)))
         if not tickers:
             return {"run_id": run_id, "target_date": str(target),
                     "overall_status": "failed", "failed_at": "validation",

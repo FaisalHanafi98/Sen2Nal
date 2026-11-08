@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Header, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.config import settings
@@ -43,6 +43,9 @@ RunIdFilter = Annotated[str | None, Query(pattern=r"^[A-Za-z0-9_-]{1,50}$")]
 
 _LOG_STAGES = frozenset(key for key, _, _ in _STAGE_VIEWS) | {"experiment", "system"}
 _LOG_LEVELS = frozenset({"info", "warning", "success", "error"})
+_ADMISSION_LOCK = select(func.pg_try_advisory_xact_lock(
+    func.hashtext(func.current_schema()), func.hashtext("sen2nal.pipeline.admission"),
+))
 
 
 def _reported_duration(value: object) -> float | None:
@@ -160,6 +163,18 @@ def get_pipeline_logs(
 def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Trigger a full pipeline run in the background."""
     import uuid
+
+    # The active-row check must see commits made before acquiring the lock.
+    db.connection(execution_options={"isolation_level": "READ COMMITTED"})
+    if db.execute(_ADMISSION_LOCK).scalar_one() is not True:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Another pipeline run is being admitted")
+    active = db.execute(
+        select(PipelineRun.id).where(PipelineRun.status == "running").limit(1)
+    ).scalar_one_or_none()
+    if active is not None:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A pipeline run is already active")
 
     run_id = f"pipeline_{uuid.uuid4().hex}"
 

@@ -56,6 +56,11 @@ suite passed 306 tests with 78.39% coverage. Dashboard logs now follow the
 run ID returned by status. The log endpoint bounds the result size and
 withholds historical free-text messages. The offline suite passed 310 tests
 with 78.66% coverage. The dashboard request fixture, Vite build and lint passed.
+The API trigger now uses a schema-scoped PostgreSQL transaction lock and checks
+for a saved active run before admitting another. The offline suite passed 312
+tests with 78.75% coverage. The two-session PostgreSQL case awaits an authorised
+test database. CLI and scheduler admission and recovery of abandoned active
+rows remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

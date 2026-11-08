@@ -493,3 +493,20 @@ blocked connection attempts. Ruff and focused mypy with skipped imports passed.
 A synthetic fixture exercised the dashboard request hook with and without a
 saved run. The Vite build and ESLint passed with the existing chunk-size and
 React hook warnings. Live browser and PostgreSQL acceptance remain open.
+
+## SN02.14 — API run admission (8 November 2026)
+
+Starting revision `bb7ea8a`. The API takes a schema-scoped PostgreSQL advisory
+transaction lock before checking for an active run. A busy lock or active row
+returns HTTP 409 without saving another run or dispatching a worker. The lock
+ends with the admission transaction. The saved row remains active until the
+worker records a terminal state. Recovery of abandoned rows needs a separate
+policy. The CLI and scheduler do not use this API guard.
+
+The first regression attempt entered the unmocked runner and was interrupted.
+The ASGI fixture now mocks all stages by default. The two corrected regressions
+failed before repair, then passed. The guarded offline suite passed 312 tests,
+skipped 43 PostgreSQL cases and deselected six download-calling cases in 7.05s.
+Coverage was 78.75%, with zero blocked connection attempts in that completed
+run. Ruff and focused mypy with skipped imports passed. The new test with
+two PostgreSQL sessions was skipped because the authorised test URL was unset.

@@ -121,10 +121,12 @@ def test_runner_preserves_first_seen_order_of_distinct_allowed_tickers(stages):
 
 
 @pytest.fixture
-def pipeline_client(monkeypatch):
+def pipeline_client(monkeypatch, stages):
     app = FastAPI()
     app.include_router(pipeline_routes.router)
     admission = MagicMock()
+    admission.execute.return_value.scalar_one.return_value = True
+    admission.execute.return_value.scalar_one_or_none.return_value = None
     worker = MagicMock()
     worker_factory = MagicMock(return_value=worker)
     app.dependency_overrides[pipeline_routes.get_db] = lambda: admission
@@ -188,6 +190,24 @@ def test_trigger_refuses_bad_key_before_writing_or_starting_a_run(pipeline_clien
     assert send("POST", "/api/v1/pipeline/run", headers=headers).status_code == 403
     admission.add.assert_not_called()
     admission.commit.assert_not_called()
+    worker_factory.assert_not_called()
+    stages[0].assert_not_called()
+
+
+@pytest.mark.parametrize("lock_available", [False, True])
+def test_trigger_refuses_admission_lock_conflict_or_active_run(
+    pipeline_client, stages, lock_available,
+):
+    send, admission, _, worker_factory = pipeline_client
+    admission.execute.return_value.scalar_one.return_value = lock_available
+    admission.execute.return_value.scalar_one_or_none.return_value = 17
+    response = send("POST", "/api/v1/pipeline/run", headers={"X-Api-Key": "fixture-only"})
+    assert response.status_code == 409
+    assert "pg_try_advisory_xact_lock" in str(admission.execute.call_args_list[0].args[0])
+    assert admission.execute.call_count == (2 if lock_available else 1)
+    admission.add.assert_not_called()
+    admission.commit.assert_not_called()
+    admission.rollback.assert_called_once()
     worker_factory.assert_not_called()
     stages[0].assert_not_called()
 

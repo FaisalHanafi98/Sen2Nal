@@ -7,8 +7,11 @@ updated, and queryable through the ORM models. Requires PostgreSQL.
 from datetime import date, datetime
 
 import pytest
-from sqlalchemy import select
+from fastapi import BackgroundTasks, HTTPException
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
 
+from src.api.routers.pipeline import _ADMISSION_LOCK, trigger_pipeline
 from src.database.models import PipelineLog, PipelineRun
 
 
@@ -69,6 +72,27 @@ class TestPipelineRunCRUD:
             select(PipelineRun).where(PipelineRun.run_id == "test_run_json")
         ).scalar_one()
         assert fetched.result_json["stages"]["ingestion"]["status"] == "success"
+
+
+def test_api_admission_checks_the_lock_and_committed_active_row(test_db_engine):
+    with Session(test_db_engine) as first, Session(test_db_engine) as second:
+        blocked_tasks = BackgroundTasks()
+        assert first.execute(_ADMISSION_LOCK).scalar_one() is True
+        with pytest.raises(HTTPException, match="being admitted") as lock_conflict:
+            trigger_pipeline(blocked_tasks, second)
+        assert lock_conflict.value.status_code == 409
+        first.rollback()
+
+        allowed_tasks = BackgroundTasks()
+        accepted = trigger_pipeline(allowed_tasks, first)
+        try:
+            with pytest.raises(HTTPException, match="already active") as row_conflict:
+                trigger_pipeline(blocked_tasks, second)
+            assert row_conflict.value.status_code == 409
+            assert len(allowed_tasks.tasks) == 1 and not blocked_tasks.tasks
+        finally:
+            first.execute(delete(PipelineRun).where(PipelineRun.run_id == accepted["run_id"]))
+            first.commit()
 
 
 class TestPipelineLogCRUD:

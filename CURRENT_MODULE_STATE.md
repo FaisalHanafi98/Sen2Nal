@@ -52,7 +52,10 @@ coverage. The legacy calendar still uses approximations. Live provider
 compatibility, source timestamps, availability reporting and concurrent
 admission remain open. The runner now rejects an explicitly empty selection
 and passes distinct allowed tickers to the stages in request order. The offline
-suite passed 306 tests with 78.39% coverage.
+suite passed 306 tests with 78.39% coverage. Dashboard logs now follow the
+run ID returned by status. The log endpoint bounds the result size and
+withholds historical free-text messages. The offline suite passed 310 tests
+with 78.66% coverage. The dashboard request fixture, Vite build and lint passed.
 
 ## Completed SN01-A foundations (4 November 2026)
 

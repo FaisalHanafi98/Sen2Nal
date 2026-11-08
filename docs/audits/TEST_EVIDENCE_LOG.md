@@ -477,3 +477,19 @@ Two focused assertions failed before repair. The offline suite passed 306 tests,
 skipped 42 PostgreSQL cases and deselected six download-calling cases in 6.58s.
 Coverage was 78.39%, with zero blocked connection attempts. Ruff and focused
 mypy with skipped imports passed.
+
+## SN02.13 — Logs for the displayed run (8 November 2026)
+
+Starting revision `ab5d522`. The log endpoint accepts an optional saved run ID,
+returns each row's run ID and caps requests at 100 rows. The response exposes
+bounded worker outcomes and withholds historical free text. The dashboard
+fetches logs for the run returned by status and skips the request when idle.
+
+Four focused assertions failed before repair. The socket-free ASGI tests
+verify query bounds, run filtering and withholding of exception text. The
+guarded offline suite passed 310 tests, skipped 42 PostgreSQL cases and
+deselected six download-calling cases in 8.61s. Coverage was 78.66%, with zero
+blocked connection attempts. Ruff and focused mypy with skipped imports passed.
+A synthetic fixture exercised the dashboard request hook with and without a
+saved run. The Vite build and ESLint passed with the existing chunk-size and
+React hook warnings. Live browser and PostgreSQL acceptance remain open.

@@ -322,3 +322,30 @@ def test_inconsistent_stage_report_cannot_certify_saved_success(pipeline_client,
     assert payload["pipelineStatus"] == "unverified"
     assert payload["stages"][-2]["status"] == "idle"
     assert payload["stages"][-1]["status"] == "idle"
+
+
+@pytest.mark.parametrize("params", [{"run_id": "invalid/id"}, {"limit": 0}, {"limit": 101}])
+def test_logs_reject_invalid_query_before_reading_db(pipeline_client, params):
+    send, db, _, _ = pipeline_client
+    assert send("GET", "/api/v1/pipeline/logs", params=params).status_code == 422
+    db.execute.assert_not_called()
+
+
+def test_logs_filter_by_run_and_withhold_legacy_exception_text(pipeline_client):
+    send, db, _, _ = pipeline_client
+    timestamp = datetime(2026, 11, 4, 13)
+    db.execute.return_value.all.return_value = [
+        (SimpleNamespace(timestamp=timestamp, stage="ingestion", level="success",
+                         message="ingestion success (0.2s)"), "saved-run"),
+        (SimpleNamespace(timestamp=timestamp, stage="system", level="error",
+                         message="Pipeline failed: synthetic private detail"), "saved-run"),
+    ]
+    response = send("GET", "/api/v1/pipeline/logs", params={"run_id": "saved-run", "limit": 2})
+    assert response.status_code == 200
+    logs = response.json()["logs"]
+    assert [log["runId"] for log in logs] == ["saved-run", "saved-run"]
+    assert logs[0]["message"] == "ingestion success (0.2s)"
+    assert logs[1]["message"] == "Log details unavailable"
+    assert "synthetic private detail" not in response.text
+    statement = db.execute.call_args.args[0]
+    assert set(statement.compile().params.values()) == {"saved-run", 2}

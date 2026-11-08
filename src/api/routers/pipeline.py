@@ -2,6 +2,7 @@
 
 import logging
 import math
+import re
 from datetime import datetime
 from typing import Annotated, Any, cast
 
@@ -39,6 +40,9 @@ _STAGE_VIEWS = (
 )
 
 RunIdFilter = Annotated[str | None, Query(pattern=r"^[A-Za-z0-9_-]{1,50}$")]
+
+_LOG_STAGES = frozenset(key for key, _, _ in _STAGE_VIEWS) | {"experiment", "system"}
+_LOG_LEVELS = frozenset({"info", "warning", "success", "error"})
 
 
 def _reported_duration(value: object) -> float | None:
@@ -120,27 +124,36 @@ def get_pipeline_status(run_id: RunIdFilter = None, db: Session = Depends(get_db
 
 
 @router.get("/logs")
-def get_pipeline_logs(limit: int = 50, db: Session = Depends(get_db)):
-    """Get recent pipeline log entries from the database."""
-    logs = db.execute(
-        select(PipelineLog)
-        .join(PipelineRun)
-        .order_by(PipelineLog.timestamp.desc())
-        .limit(limit)
-    ).scalars().all()
-
-    if not logs:
-        return {"logs": []}
-
-    return {"logs": [
-        {
+def get_pipeline_logs(
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    run_id: RunIdFilter = None,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Get recent saved outcomes without exposing historical exception text."""
+    query = select(PipelineLog, PipelineRun.run_id).join(PipelineRun)
+    if run_id is not None:
+        query = query.where(PipelineRun.run_id == run_id)
+    rows = db.execute(
+        query.order_by(PipelineLog.timestamp.desc().nulls_last(), PipelineLog.id.desc()).limit(limit)
+    ).all()
+    logs = []
+    for log, saved_id in rows:
+        stage = log.stage if log.stage in _LOG_STAGES else "system"
+        message = "Log details unavailable"
+        if (stage == "system" and log.message == "Pipeline worker failed") or (
+            stage == log.stage and re.fullmatch(
+                rf"{stage} (success|failed|invalid|partial) \([0-9]{{1,8}}\.[0-9]s\)", log.message
+            )
+        ):
+            message = log.message
+        logs.append({
+            "runId": saved_id,
             "timestamp": log.timestamp.isoformat() if log.timestamp else "",
-            "stage": log.stage,
-            "message": log.message,
-            "level": log.level,
-        }
-        for log in logs
-    ]}
+            "stage": stage,
+            "message": message,
+            "level": log.level if log.level in _LOG_LEVELS else "info",
+        })
+    return {"logs": logs}
 
 
 @router.post("/run", dependencies=[Depends(verify_pipeline_key)])

@@ -6,13 +6,18 @@ import { fetchDashboardData as fetchMockData } from './mock/handlers'
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA !== 'false'
 
 async function fetchLiveData(): Promise<DashboardData> {
-  const [stocksRes, historyRes, expRes, fgRes, pipeRes, logsRes] = await Promise.all([
+  const statusRequest = apiClient.get('/pipeline/status')
+  const [stocksRes, historyRes, expRes, fgRes, pipeRes, pipelineLogs] = await Promise.all([
     apiClient.get('/stocks'),
     apiClient.get('/stocks/history', { params: { ticker: 'AAPL', days: 30 } }),
     apiClient.get('/experiments'),
     apiClient.get('/stocks/fear-greed'),
-    apiClient.get('/pipeline/status'),
-    apiClient.get('/pipeline/logs'),
+    statusRequest,
+    statusRequest.then(async ({ data }) => {
+      if (typeof data.runId !== 'string' || data.runId.length === 0) return []
+      const { data: runLogs } = await apiClient.get('/pipeline/logs', { params: { run_id: data.runId } })
+      return runLogs.logs ?? []
+    }),
   ])
 
   const runStatus: unknown = pipeRes.data.pipelineStatus
@@ -24,7 +29,7 @@ async function fetchLiveData(): Promise<DashboardData> {
     sentimentHistory: historyRes.data.history ?? [],
     experiments: expRes.data.experiments ?? [],
     fearGreed: fgRes.data ?? { score: 50, classification: 'Neutral', prevScore: 50, change: 0 },
-    pipelineLogs: logsRes.data.logs ?? [],
+    pipelineLogs,
     pipelineStatuses: pipeRes.data.stages ?? [],
   }
 }

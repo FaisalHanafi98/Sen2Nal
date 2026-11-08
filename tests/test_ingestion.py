@@ -9,6 +9,7 @@ from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from src.agents import ingestion
@@ -218,3 +219,81 @@ def test_invalid_reddit_record_cannot_be_committed(text_ingestion, monkeypatch):
     text_ingestion.db.add.assert_not_called()
     text_ingestion.db.commit.assert_not_called()
     text_ingestion.db.rollback.assert_called_once()
+
+
+@pytest.fixture
+def market_ingestion(agent, monkeypatch):
+    monkeypatch.setattr(agent, "_ensure_stocks", MagicMock())
+    monkeypatch.setattr(agent, "_ensure_calendar", MagicMock())
+    monkeypatch.setattr(agent, "_get_stock_id", lambda ticker: 1)
+    monkeypatch.setattr(agent, "_get_or_create_date_id", lambda day: day.day)
+    monkeypatch.setattr(agent, "_ingest_news", lambda *args: 0)
+    monkeypatch.setattr(agent, "_ingest_reddit", lambda *args: 0)
+    monkeypatch.setattr(ingestion.time, "sleep", lambda *args: None)
+    agent.db.execute.return_value.scalar.return_value = None
+    return agent
+
+
+def _stub_history(monkeypatch, rows):
+    frame = pd.DataFrame(rows, index=pd.date_range("2026-11-02", periods=len(rows)))
+    stock = SimpleNamespace(history=lambda **kwargs: frame)
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(Ticker=lambda ticker: stock))
+
+
+PRICE_BAR = {"Open": 10.0, "High": 11.0, "Low": 9.0, "Close": 10.0, "Volume": 0}
+
+
+@pytest.mark.parametrize("invalid_fields", [
+    {"Close": float("nan")}, {"High": 9.5}, {"Volume": -1}, {"Volume": 0.5}, {"Open": "10"},
+])
+def test_invalid_price_bar_rolls_back_earlier_bar(market_ingestion, monkeypatch, invalid_fields):
+    monkeypatch.setattr(market_ingestion, "_ingest_fear_greed", lambda *args: None)
+    _stub_history(monkeypatch, [PRICE_BAR, {**PRICE_BAR, **invalid_fields}])
+    result = market_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "invalid"
+    market_ingestion.db.add.assert_called_once()
+    market_ingestion.db.commit.assert_not_called()
+    market_ingestion.db.rollback.assert_called_once()
+
+
+def test_price_write_retains_observed_zero_return_and_volume(market_ingestion, monkeypatch):
+    monkeypatch.setattr(market_ingestion, "_ingest_fear_greed", lambda *args: None)
+    _stub_history(monkeypatch, [PRICE_BAR, PRICE_BAR])
+    result = market_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "success" and result["prices_ingested"] == 2
+    first, second = [call.args[0] for call in market_ingestion.db.add.call_args_list]
+    assert first.daily_return is None
+    assert second.daily_return == 0.0 and second.volume == 0
+    assert [type(second.daily_return), type(second.volume), type(second.close)] == [float, int, float]
+
+
+@pytest.mark.parametrize("score_data", [
+    {}, {"score": 100.9, "rating": "extreme greed"}, {"score": True, "rating": "fear"},
+    {"score": float("inf"), "rating": "greed"}, {"score": 50},
+])
+def test_invalid_fear_greed_score_cannot_be_committed(market_ingestion, monkeypatch, score_data):
+    _stub_history(monkeypatch, [PRICE_BAR])
+    response = MagicMock()
+    response.json.return_value = {"fear_and_greed": score_data}
+    monkeypatch.setattr(ingestion.requests, "get", MagicMock(return_value=response))
+    result = market_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "invalid"
+    market_ingestion.db.add.assert_called_once()
+    market_ingestion.db.commit.assert_not_called()
+    market_ingestion.db.rollback.assert_called_once()
+
+
+@pytest.mark.parametrize("history", [[[0, 0], [1, 1]], [{"x": 0, "y": 0}, {"x": 1, "y": 1}]])
+def test_fear_greed_keeps_a_zero_previous_score(market_ingestion, monkeypatch, history):
+    monkeypatch.setattr(market_ingestion, "_ingest_prices", lambda *args: 0)
+    response = MagicMock()
+    response.json.return_value = {
+        "fear_and_greed": {"score": 1, "rating": "extreme fear"},
+        "fear_and_greed_historical": {"data": history},
+    }
+    monkeypatch.setattr(ingestion.requests, "get", MagicMock(return_value=response))
+    result = market_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "success"
+    assert result["fear_greed"] == {"score": 1, "classification": "extreme fear"}
+    record = market_ingestion.db.add.call_args.args[0]
+    assert record.prev_score == 0 and record.score_change == 1

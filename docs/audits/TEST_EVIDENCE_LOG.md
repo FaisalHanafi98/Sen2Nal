@@ -438,3 +438,18 @@ in 4.49s. Coverage was 75.80%, with zero blocked connection attempts. Ruff and
 focused mypy with skipped imports passed. Tests use fixture payloads and mocked
 sessions. Provider response compatibility and PostgreSQL transactions still
 require verification.
+
+## SN02.10 — Market ingestion write validation (8 November 2026)
+
+Starting revision `ca5eefe`. Price rows require bounded finite OHLC values,
+consistent bar ranges, whole nonnegative volume and ordered dates within the
+requested window. A flat return is stored as zero. Fear & Greed requires a
+score and rating. It preserves an observed zero prior score when calculating
+the change. Malformed market records roll back pending ingestion writes.
+
+Thirteen focused assertions failed before repair. The offline suite passed 301
+tests, skipped 42 PostgreSQL cases and deselected six download-calling cases.
+Coverage was 77.91%, with zero blocked connection attempts. Ruff and focused
+mypy with skipped imports passed. The tests use fixture provider responses and
+mocked sessions. Live provider shapes, as-of eligibility and PostgreSQL storage
+remain unverified.

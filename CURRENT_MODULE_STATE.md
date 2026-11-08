@@ -43,9 +43,11 @@ coverage. Both prediction paths now validate database write records. The model
 path checks the binary probability distribution, and the fallback preserves zero
 and reports no new record for missing input. The offline suite passed 280 tests
 with 74.02% coverage. NewsAPI and Reddit records now pass write contracts before
-staging, and malformed records trigger rollback. The offline suite passed 288
-tests with 75.80% coverage. Price and Fear & Greed record gates, provider
-availability reporting and concurrent admission remain open.
+staging, and malformed records trigger rollback. Price bars and Fear & Greed
+records now have write contracts too. Flat price returns and zero prior index
+scores are preserved. The offline suite passed 301 tests with 77.91% coverage.
+Live provider compatibility, source timestamps, availability reporting and
+concurrent admission remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

@@ -1,9 +1,9 @@
 """Data contract for Agent 1 (Data Ingestion) output."""
 
-from datetime import datetime
-from typing import Annotated, Literal
+from datetime import date, datetime
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, HttpUrl, NaiveDatetime
+from pydantic import Field, HttpUrl, NaiveDatetime, model_validator
 
 from src.contracts.base import StrictContract
 
@@ -56,3 +56,40 @@ class RedditWrite(StrictContract):
     created_utc: NaiveDatetime
     tickers_mentioned: list[TickerMention] = Field(min_length=1)
     is_processed: Literal[False]
+
+
+StoredPrice = Annotated[float, Field(gt=0, lt=100_000_000)]
+StoredIndexScore = Annotated[int, Field(ge=0, le=100)]
+
+
+class PriceWrite(StrictContract):
+    """Validated fields for a daily price bar."""
+
+    stock_id: int = Field(gt=0)
+    date_id: int = Field(gt=0)
+    date: date
+    open: StoredPrice
+    high: StoredPrice
+    low: StoredPrice
+    close: StoredPrice
+    adj_close: StoredPrice
+    volume: int = Field(ge=0, le=2**63 - 1)
+    daily_return: float | None = Field(ge=-1, lt=1000)
+    intraday_range: float = Field(ge=0, lt=1000)
+
+    @model_validator(mode="after")
+    def check_price_range(self) -> Self:
+        if self.low > min(self.open, self.close) or self.high < max(self.open, self.close):
+            raise ValueError("open and close must be within the bar's low and high")
+        return self
+
+
+class FearGreedWrite(StrictContract):
+    """Validated fields for a daily Fear & Greed row."""
+
+    date_id: int = Field(gt=0)
+    date: date
+    score: StoredIndexScore
+    classification: str = Field(min_length=1, max_length=20)
+    prev_score: StoredIndexScore | None
+    score_change: int | None = Field(ge=-100, le=100)

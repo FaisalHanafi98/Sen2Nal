@@ -11,8 +11,10 @@ Normalizes data, validates with contracts, stores in staging + fact tables.
 
 import hashlib
 import logging
+import math
 import time
 from datetime import date, datetime, timedelta, timezone
+from numbers import Real
 from typing import Any, cast
 
 import requests  # type: ignore[import-untyped]
@@ -22,7 +24,7 @@ from src.agents.base import BaseAgent
 from src.config import settings
 from src.constants import TOP_10_TICKERS
 from src.contracts.base import DataContractViolation
-from src.contracts.ingestion import NewsWrite, RedditWrite
+from src.contracts.ingestion import FearGreedWrite, NewsWrite, PriceWrite, RedditWrite
 from src.database.models import (
     DimCalendar,
     DimFearGreed,
@@ -150,55 +152,72 @@ class IngestionAgent(BaseAgent):
         count = 0
         start = target - timedelta(days=5)
         end = target + timedelta(days=1)
+        columns = ["Open", "High", "Low", "Close", "Volume"]
 
         for ticker in tickers:
             try:
                 stock = yf.Ticker(ticker)
                 hist = stock.history(start=str(start), end=str(end))
-                if hist.empty:
-                    self.logger.debug(f"No price data for {ticker}")
-                    continue
+            except Exception:
+                self.logger.warning("Price fetch failed for %s", ticker)
+                continue
+            if len(hist.index) == 0:
+                self.logger.debug("No price data for %s", ticker)
+                continue
+            if not hist.columns.is_unique or any(column not in hist.columns for column in columns):
+                raise _invalid_ingestion_field("price_columns")
 
-                stock_id = self._get_stock_id(ticker)
-                if not stock_id:
-                    continue
+            stock_id = self._get_stock_id(ticker)
+            if stock_id is None:
+                raise _invalid_ingestion_field("stock_id")
 
-                for idx, row in hist.iterrows():
-                    row_date = idx.date() if hasattr(idx, 'date') else idx
-                    date_id = self._get_or_create_date_id(row_date)
+            prev_date = start - timedelta(days=1)
+            prev_close: float | None = None
+            bars = hist[columns]
+            for idx, open_raw, high_raw, low_raw, close_raw, volume_raw in bars.itertuples(name=None):
+                row_date = idx.date() if hasattr(idx, "date") else idx
+                if not isinstance(row_date, date) or not prev_date < row_date <= target:
+                    raise _invalid_ingestion_field("price_date")
+                price_open = _source_number(open_raw, "open")
+                high = _source_number(high_raw, "high")
+                low = _source_number(low_raw, "low")
+                close = _source_number(close_raw, "close")
+                if price_open <= 0 or close <= 0:
+                    raise _invalid_ingestion_field("price_bar")
+                _source_number(volume_raw, "volume")
+                volume = int(volume_raw)
+                if volume_raw != volume:
+                    raise _invalid_ingestion_field("volume")
 
-                    existing = self.db.execute(
-                        select(FactPrice.price_id).where(
-                            FactPrice.stock_id == stock_id,
-                            FactPrice.date_id == date_id,
-                        )
-                    ).scalar()
-                    if existing:
-                        continue
+                date_id = self._get_or_create_date_id(row_date)
+                values = {
+                    "stock_id": stock_id,
+                    "date_id": date_id,
+                    "date": row_date,
+                    "open": round(price_open, 4),
+                    "high": round(high, 4),
+                    "low": round(low, 4),
+                    "close": round(close, 4),
+                    "adj_close": round(close, 4),
+                    "volume": volume,
+                    "daily_return": (round((close - prev_close) / prev_close, 5)
+                                     if prev_close is not None else None),
+                    "intraday_range": round((high - low) / price_open, 5),
+                }
+                require_record("ingestion", PriceWrite, values)
+                prev_date, prev_close = row_date, close
 
-                    prev_close = hist["Close"].shift(1).get(idx)
-                    daily_ret = ((row["Close"] - prev_close) / prev_close
-                                 if prev_close and prev_close > 0 else None)
-
-                    self.db.add(FactPrice(
-                        stock_id=stock_id,
-                        date_id=date_id,
-                        date=row_date,
-                        open=round(row["Open"], 4),
-                        high=round(row["High"], 4),
-                        low=round(row["Low"], 4),
-                        close=round(row["Close"], 4),
-                        adj_close=round(row["Close"], 4),
-                        volume=int(row["Volume"]),
-                        daily_return=round(daily_ret, 5) if daily_ret else None,
-                        intraday_range=round((row["High"] - row["Low"]) / row["Open"], 5)
-                        if row["Open"] > 0 else None,
-                    ))
+                existing = self.db.execute(
+                    select(FactPrice.price_id).where(
+                        FactPrice.stock_id == stock_id,
+                        FactPrice.date_id == date_id,
+                    )
+                ).scalar()
+                if not existing:
+                    self.db.add(FactPrice(**values))
                     count += 1
 
-                time.sleep(0.2)  # Rate limiting
-            except Exception as e:
-                self.logger.warning(f"Price fetch failed for {ticker}: {e}")
+            time.sleep(0.2)  # Rate limiting
 
         self.db.flush()
         self.logger.info(f"Ingested {count} price records")
@@ -375,40 +394,51 @@ class IngestionAgent(BaseAgent):
                 timeout=15,
             )
             resp.raise_for_status()
-            data = resp.json()
-
-            score_data = data.get("fear_and_greed", {})
-            score = int(score_data.get("score", 0))
-            rating = score_data.get("rating", "Neutral")
-
-            # Previous close
-            prev = data.get("fear_and_greed_historical", {}).get("data", [])
-            prev_score = int(prev[-2][1]) if len(prev) >= 2 else None
-
-            date_id = self._get_or_create_date_id(target)
-
-            existing = self.db.execute(
-                select(DimFearGreed.fg_id).where(DimFearGreed.date == target)
-            ).scalar()
-
-            if not existing:
-                self.db.add(DimFearGreed(
-                    date_id=date_id,
-                    date=target,
-                    score=score,
-                    classification=rating,
-                    prev_score=prev_score,
-                    score_change=score - prev_score if prev_score else None,
-                ))
-                self.db.flush()
-
-            result = {"score": score, "classification": rating}
-            self.logger.info(f"Fear & Greed: {score} ({rating})")
-            return result
-
-        except Exception as e:
-            self.logger.warning(f"Fear & Greed fetch failed: {e}")
+        except Exception:
+            self.logger.warning("Fear & Greed fetch failed")
             return None
+        try:
+            data = resp.json()
+        except ValueError:
+            raise _invalid_ingestion_field("fear_and_greed") from None
+        score_data = data.get("fear_and_greed") if isinstance(data, dict) else None
+        if not isinstance(score_data, dict):
+            raise _invalid_ingestion_field("fear_and_greed")
+
+        score = _index_score(score_data.get("score"), "score")
+        rating = _source_text(score_data.get("rating"), "classification")
+        history = data.get("fear_and_greed_historical", {})
+        points = history.get("data", []) if isinstance(history, dict) else None
+        if not isinstance(points, list):
+            raise _invalid_ingestion_field("fear_and_greed_historical")
+        prev_score = None
+        if len(points) >= 2:
+            point = points[-2]
+            if isinstance(point, dict):
+                prev_score = _index_score(point.get("y"), "prev_score")
+            elif isinstance(point, list) and len(point) == 2:
+                prev_score = _index_score(point[1], "prev_score")
+            else:
+                raise _invalid_ingestion_field("prev_score")
+
+        values = {
+            "date_id": self._get_or_create_date_id(target),
+            "date": target,
+            "score": score,
+            "classification": rating.strip() if rating else None,
+            "prev_score": prev_score,
+            "score_change": score - prev_score if prev_score is not None else None,
+        }
+        require_record("ingestion", FearGreedWrite, values)
+        existing = self.db.execute(
+            select(DimFearGreed.fg_id).where(DimFearGreed.date == target)
+        ).scalar()
+        if not existing:
+            self.db.add(DimFearGreed(**values))
+            self.db.flush()
+
+        self.logger.info("Fear & Greed score: %s", score)
+        return {"score": score, "classification": values["classification"]}
 
     # =========================================================================
     # Helpers
@@ -480,6 +510,25 @@ def _source_text(value: object, field: str, limit: int | None = None) -> str | N
     if not isinstance(value, str) or "\x00" in value:
         raise _invalid_ingestion_field(field)
     return value[:limit] or None
+
+
+def _source_number(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise _invalid_ingestion_field(field)
+    try:
+        number = float(value)
+    except OverflowError:
+        raise _invalid_ingestion_field(field) from None
+    if not math.isfinite(number):
+        raise _invalid_ingestion_field(field)
+    return number
+
+
+def _index_score(value: object, field: str) -> int:
+    number = _source_number(value, field)
+    if not 0 <= number <= 100:
+        raise _invalid_ingestion_field(field)
+    return int(number)
 
 
 def _parse_datetime(s: object) -> datetime | None:

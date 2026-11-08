@@ -1,3 +1,7 @@
+For a request to research or discover this folder, resume prior work, or move to
+a new workstation, start with [SESSION_MIGRATION_PROMPT.md](SESSION_MIGRATION_PROMPT.md).
+Follow its read-only discovery pass before summarising the project or proposing work.
+
 Six-agent sequential ML pipeline: FinBERT sentiment (VADER fallback) + calendar
 seasonality → XGBoost trading signals in the current implementation.
 The owner-defined release is daily US-only sentiment-led research tags, initially

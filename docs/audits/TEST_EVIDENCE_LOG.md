@@ -548,3 +548,18 @@ six download-calling cases in 6.91s. Coverage was 78.93%, with zero blocked
 connection attempts. Ruff and focused mypy with skipped imports passed.
 Tests use mocked stages and sessions. The live CLI, scheduler and
 PostgreSQL concurrency were outside this check.
+
+## SN02.18 — Claim each queued run once (8 November 2026)
+
+Starting revision `5337810`. Admission saves a queued row. A conditional
+update claims it and commits the transition to running before stages execute.
+Queued and running both block a second admission. The status endpoint and
+dashboard distinguish the two states without guessing which stage is active.
+
+The commit-before-execution regression failed before repair. The guarded
+offline suite passed 320 tests, skipped 43 PostgreSQL cases and deselected
+six download-calling cases in 9.05s. Coverage was 78.95%, with zero blocked
+connection attempts. Ruff and focused mypy with skipped imports passed.
+Synthetic dashboard rendering, Vite and ESLint passed with the existing
+warnings. The two-session test now includes a duplicate claim. It remains
+skipped without an authorised test URL. Abandoned rows require reconciliation.

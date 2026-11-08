@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from src.database.models import PipelineLog, PipelineRun
@@ -30,14 +30,14 @@ def admit_pipeline_run(db: Session, target_date: date) -> str:
         db.rollback()
         raise PipelineRunBusy("Another pipeline run is being admitted")
     active = db.execute(
-        select(PipelineRun.id).where(PipelineRun.status == "running").limit(1)
+        select(PipelineRun.id).where(PipelineRun.status.in_(("queued", "running"))).limit(1)
     ).scalar_one_or_none()
     if active is not None:
         db.rollback()
         raise PipelineRunBusy("A pipeline run is already active")
 
     run_id = f"pipeline_{uuid.uuid4().hex}"
-    db.add(PipelineRun(run_id=run_id, target_date=target_date, status="running"))
+    db.add(PipelineRun(run_id=run_id, target_date=target_date, status="queued"))
     db.commit()
     return run_id
 
@@ -45,14 +45,22 @@ def admit_pipeline_run(db: Session, target_date: date) -> str:
 def execute_saved_run(
     db: Session, run_id: str, run: Callable[..., dict[str, Any]],
 ) -> dict[str, Any] | None:
-    """Run a saved active job and persist its correlated terminal outcomes."""
+    """Claim a queued job and persist its correlated terminal outcomes."""
+    claim = (
+        update(PipelineRun)
+        .where(PipelineRun.run_id == run_id, PipelineRun.status == "queued")
+        .values(status="running")
+        .returning(PipelineRun)
+    )
+    record = cast(Any, db.execute(claim).scalar_one_or_none())
+    if record is None:
+        db.rollback()
+        return None
+
+    target = record.target_date
+    db.commit()
     query = select(PipelineRun).where(PipelineRun.run_id == run_id)
     try:
-        record = cast(Any, db.execute(query).scalar_one_or_none())
-        if record is None or record.status != "running":
-            return None
-
-        target = record.target_date
         result = run(db, target_date=target, run_id=run_id)
         if (result.get("run_id") != run_id or result.get("target_date") != target.isoformat()
                 or result.get("overall_status") not in ("success", "failed")):

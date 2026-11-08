@@ -70,6 +70,11 @@ outcomes. A synthetic render, the Vite build and lint passed.
 The API, CLI and scheduler entry points now share admission and save outcomes
 against one run ID. The offline suite passed 317 tests with 78.93% coverage.
 The scheduler cadence and live entry points still require separate verification.
+New runs are saved as queued. A worker must claim a queued run and commit
+the change to running before starting stages. The dashboard shows both
+states. The offline suite passed 320 tests with 78.95% coverage. The
+two-session test covers a duplicate worker claim when run on an authorised
+PostgreSQL database. Legacy running rows remain active until reconciled.
 
 ## Completed SN01-A foundations (4 November 2026)
 

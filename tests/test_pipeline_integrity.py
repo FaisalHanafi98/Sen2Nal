@@ -130,6 +130,8 @@ def test_synchronous_entry_point_saves_the_run_and_its_outcomes(stages):
             return None
         record = db.add.call_args_list[0].args[0]
         record.id = 17
+        assert record.status == "queued"
+        record.status = "running"
         return record
 
     db.execute.return_value.scalar_one_or_none.side_effect = read_row
@@ -140,7 +142,7 @@ def test_synchronous_entry_point_saves_the_run_and_its_outcomes(stages):
     assert record.status == "success" and record.target_date == target
     assert result["run_id"] == record.run_id
     assert record.result_json == result
-    assert db.commit.call_count == 2
+    assert db.commit.call_count == 3
     for constructor in stages:
         constructor.assert_called_once_with(db, record.run_id)
 
@@ -175,6 +177,18 @@ def pipeline_client(monkeypatch, stages):
         worker.execute.return_value.scalar_one_or_none.return_value = row
 
     admission.add.side_effect = attach
+
+    def execute_worker(statement):
+        read_result = worker.execute.return_value
+        if not statement.is_update:
+            return read_result
+        row = read_result.scalar_one_or_none()
+        if row is None or row.status != "queued":
+            return SimpleNamespace(scalar_one_or_none=lambda: None)
+        row.status = "running"
+        return SimpleNamespace(scalar_one_or_none=lambda: row)
+
+    worker.execute.side_effect = execute_worker
 
     async def inline_thread_call(function, *args, **kwargs):
         return function(*args)
@@ -221,6 +235,25 @@ def test_trigger_worker_and_stage_results_share_the_saved_run(pipeline_client, s
     worker.close.assert_called_once()
 
 
+def test_worker_claims_the_run_before_any_stage_starts(pipeline_client, stages):
+    send, admission, worker, _ = pipeline_client
+    first_stage = stages[0].return_value.run
+
+    def inspect_claim(**kwargs):
+        assert admission.add.call_args.args[0].status == "running"
+        worker.commit.assert_called_once()
+        return {"status": "success"}
+
+    first_stage.side_effect = inspect_claim
+    response = send("POST", "/api/v1/pipeline/run", headers={"X-Api-Key": "fixture-only"})
+    assert response.is_success
+    assert admission.add.call_args.args[0].status == "success"
+    assert worker.commit.call_count == 2
+    claim = worker.execute.call_args_list[0].args[0]
+    assert claim.is_update
+    assert {"queued", "running"}.issubset(claim.compile().params.values())
+
+
 @pytest.mark.parametrize("headers", [{}, {"X-Api-Key": "wrong-fixture"}])
 def test_trigger_refuses_bad_key_before_writing_or_starting_a_run(pipeline_client, stages, headers):
     send, admission, _, worker_factory = pipeline_client
@@ -249,7 +282,7 @@ def test_trigger_refuses_admission_lock_conflict_or_active_run(
     stages[0].assert_not_called()
 
 
-@pytest.mark.parametrize("state", [None, "success"])
+@pytest.mark.parametrize("state", [None, "running", "success"])
 def test_worker_skips_missing_or_terminal_run_rows(pipeline_client, stages, state):
     send, admission, worker, _ = pipeline_client
 
@@ -291,7 +324,7 @@ def status_row(status, stages=None, *, report_id="saved-run"):
     return SimpleNamespace(
         run_id="saved-run", target_date=day, status=status,
         started_at=datetime(2026, 11, 4, 13),
-        finished_at=datetime(2026, 11, 4, 13, 1) if status != "running" else None,
+        finished_at=datetime(2026, 11, 4, 13, 1) if status not in ("queued", "running") else None,
         result_json={"run_id": report_id, "target_date": day.isoformat(),
                      "overall_status": status, "stages": stages} if stages is not None else None,
     )
@@ -345,12 +378,13 @@ def test_status_retains_zero_counts_for_a_correlated_completed_stage(pipeline_cl
     assert stages["Output & Storage"]["status"] == "complete"
 
 
-def test_status_for_active_run_avoids_guessing_which_stage_is_running(pipeline_client):
+@pytest.mark.parametrize("state", ["queued", "running"])
+def test_status_for_active_run_avoids_guessing_which_stage_is_running(pipeline_client, state):
     send, db, _, _ = pipeline_client
     db.execute.return_value.scalar.return_value = 77
-    db.execute.return_value.scalar_one_or_none.return_value = status_row("running")
+    db.execute.return_value.scalar_one_or_none.return_value = status_row(state)
     payload = send("GET", "/api/v1/pipeline/status").json()
-    assert payload["pipelineStatus"] == "running"
+    assert payload["pipelineStatus"] == state
     assert all(stage["status"] == "idle" for stage in payload["stages"])
 
 

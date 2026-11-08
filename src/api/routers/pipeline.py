@@ -104,7 +104,7 @@ def get_pipeline_status(run_id: RunIdFilter = None, db: Session = Depends(get_db
     stages = [_stage_view(label, reports.get(key), selected_id, last_run, counters)
               for key, label, counters in _STAGE_VIEWS]
     complete = recorded_status == "success" and all(stage["status"] == "complete" for stage in stages)
-    if complete or recorded_status in ("idle", "running", "failed"):
+    if complete or recorded_status in ("idle", "queued", "running", "failed"):
         pipeline_status = recorded_status
     else:
         pipeline_status = "unverified"

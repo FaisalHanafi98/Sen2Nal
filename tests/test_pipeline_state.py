@@ -5,6 +5,7 @@ updated, and queryable through the ORM models. Requires PostgreSQL.
 """
 
 from datetime import date, datetime
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import BackgroundTasks, HTTPException
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from src.api.routers.pipeline import trigger_pipeline
 from src.database.models import PipelineLog, PipelineRun
-from src.pipeline.runs import _ADMISSION_LOCK
+from src.pipeline.runs import _ADMISSION_LOCK, execute_saved_run
 
 
 class TestPipelineRunCRUD:
@@ -91,6 +92,16 @@ def test_api_admission_checks_the_lock_and_committed_active_row(test_db_engine):
                 trigger_pipeline(blocked_tasks, second)
             assert row_conflict.value.status_code == 409
             assert len(allowed_tasks.tasks) == 1 and not blocked_tasks.tasks
+
+            def simulate_run(db, *, target_date, run_id):
+                duplicate = MagicMock()
+                assert execute_saved_run(second, run_id, duplicate) is None
+                duplicate.assert_not_called()
+                return {"run_id": run_id, "target_date": target_date.isoformat(),
+                        "overall_status": "success", "stages": {}}
+
+            result = execute_saved_run(first, accepted["run_id"], simulate_run)
+            assert result["overall_status"] == "success"
         finally:
             first.execute(delete(PipelineRun).where(PipelineRun.run_id == accepted["run_id"]))
             first.commit()

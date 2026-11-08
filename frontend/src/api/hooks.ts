@@ -23,7 +23,7 @@ async function fetchLiveData(): Promise<DashboardData> {
   const runStatus: unknown = pipeRes.data.pipelineStatus
   return {
     dataMode: 'live',
-    pipelineRunStatus: runStatus === 'idle' || runStatus === 'running' ||
+    pipelineRunStatus: runStatus === 'idle' || runStatus === 'queued' || runStatus === 'running' ||
       runStatus === 'success' || runStatus === 'failed' ? runStatus : 'unverified',
     stocks: stocksRes.data.stocks ?? [],
     sentimentHistory: historyRes.data.history ?? [],

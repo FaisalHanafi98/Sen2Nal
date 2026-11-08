@@ -13,6 +13,7 @@ import PipelineFlow from '@/components/pipeline/PipelineFlow'
 
 const runStatusLabels = {
   idle: 'Idle',
+  queued: 'Queued',
   running: 'Running',
   success: 'Succeeded',
   failed: 'Failed',

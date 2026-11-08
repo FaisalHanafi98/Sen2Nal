@@ -11,8 +11,9 @@ from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from src.api.routers.pipeline import _ADMISSION_LOCK, trigger_pipeline
+from src.api.routers.pipeline import trigger_pipeline
 from src.database.models import PipelineLog, PipelineRun
+from src.pipeline.runs import _ADMISSION_LOCK
 
 
 class TestPipelineRunCRUD:

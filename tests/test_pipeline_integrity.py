@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from src.api.routers import pipeline as pipeline_routes
 from src.database import connection
 from src.pipeline import runner
+from src.pipeline.runs import PipelineRunBusy
 
 
 STAGES = ("ingestion", "sentiment", "calendar", "features", "prediction", "experiment")
@@ -118,6 +119,42 @@ def test_runner_preserves_first_seen_order_of_distinct_allowed_tickers(stages):
     )
     assert result["overall_status"] == "success"
     stages[0].return_value.run.assert_called_once_with(target_date=day, tickers=["MSFT", "AAPL"])
+
+
+def test_synchronous_entry_point_saves_the_run_and_its_outcomes(stages):
+    db = MagicMock()
+    db.execute.return_value.scalar_one.return_value = True
+
+    def read_row():
+        if not db.add.call_args_list:
+            return None
+        record = db.add.call_args_list[0].args[0]
+        record.id = 17
+        return record
+
+    db.execute.return_value.scalar_one_or_none.side_effect = read_row
+    target = date(2026, 11, 4)
+    result = runner.run_pipeline_async(db, target)
+    assert db.add.call_args_list
+    record = db.add.call_args_list[0].args[0]
+    assert record.status == "success" and record.target_date == target
+    assert result["run_id"] == record.run_id
+    assert record.result_json == result
+    assert db.commit.call_count == 2
+    for constructor in stages:
+        constructor.assert_called_once_with(db, record.run_id)
+
+
+def test_synchronous_entry_point_refuses_an_active_api_run(stages):
+    db = MagicMock()
+    db.execute.return_value.scalar_one.return_value = True
+    db.execute.return_value.scalar_one_or_none.return_value = 17
+    with pytest.raises(PipelineRunBusy, match="already active"):
+        runner.run_pipeline_async(db, date(2026, 11, 4))
+    db.rollback.assert_called_once()
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    stages[0].assert_not_called()
 
 
 @pytest.fixture

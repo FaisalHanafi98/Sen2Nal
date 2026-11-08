@@ -26,6 +26,7 @@ from src.agents.calendar import CalendarAgent
 from src.agents.features import FeatureAgent
 from src.agents.prediction import PredictionAgent
 from src.agents.experiment import ExperimentAgent
+from src.pipeline.runs import PipelineRunBusy, admit_pipeline_run, execute_saved_run
 
 logger = logging.getLogger("sen2nal.pipeline")
 
@@ -161,8 +162,12 @@ def run_full_pipeline(
 
 
 def run_pipeline_async(db: Session, target_date: date | None = None) -> dict[str, Any]:
-    """Wrapper for background task execution."""
-    return run_full_pipeline(db, target_date)
+    """Admit and execute a tracked run for synchronous entry points."""
+    run_id = admit_pipeline_run(db, target_date or date.today())
+    result = execute_saved_run(db, run_id, run_full_pipeline)
+    if result is None:
+        raise RuntimeError("The admitted pipeline run is no longer active")
+    return result
 
 
 # =============================================================================
@@ -184,11 +189,14 @@ if __name__ == "__main__":
 
     db = SessionLocal()
     try:
-        result = run_full_pipeline(db, target)
+        result = run_pipeline_async(db, target)
         print(f"\nPipeline result: {result['overall_status']}")
         for stage, data in result["stages"].items():
             status = data.get("status", "unknown")
             elapsed = data.get("elapsed_seconds", 0)
             print(f"  {stage}: {status} ({elapsed:.1f}s)")
+    except PipelineRunBusy as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
     finally:
         db.close()

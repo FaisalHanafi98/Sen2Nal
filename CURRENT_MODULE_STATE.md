@@ -59,8 +59,7 @@ with 78.66% coverage. The dashboard request fixture, Vite build and lint passed.
 The API trigger now uses a schema-scoped PostgreSQL transaction lock and checks
 for a saved active run before admitting another. The offline suite passed 312
 tests with 78.75% coverage. The two-session PostgreSQL case awaits an authorised
-test database. CLI and scheduler admission and recovery of abandoned active
-rows remain open.
+test database. Recovery of abandoned active rows remains open.
 Reported failures from price, configured NewsAPI or configured Reddit now
 mark ingestion partial and roll back pending writes. A valid empty NewsAPI
 response can still succeed. Fear & Greed transport availability is recorded
@@ -68,6 +67,9 @@ separately because the critical signal stages do not consume that index.
 The offline suite passed 315 tests with 78.91% coverage.
 The dashboard shows incomplete inputs and invalid output as distinct stage
 outcomes. A synthetic render, the Vite build and lint passed.
+The API, CLI and scheduler entry points now share admission and save outcomes
+against one run ID. The offline suite passed 317 tests with 78.93% coverage.
+The scheduler cadence and live entry points still require separate verification.
 
 ## Completed SN01-A foundations (4 November 2026)
 

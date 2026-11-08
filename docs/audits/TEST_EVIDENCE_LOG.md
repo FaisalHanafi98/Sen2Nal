@@ -534,3 +534,17 @@ labels. The synthetic render reproduced the missing distinction before repair.
 It then checked all three labels, the saved run status and sample mode. The
 Vite build and ESLint passed with the existing chunk-size and React hook
 warnings. A live browser session was outside this check.
+
+## SN02.17 — Shared run admission and outcome storage (8 November 2026)
+
+Starting revision `e1fc6e0`. The API, CLI and scheduler now use the same active
+row check and save terminal reports against the admitted run ID. The
+synchronous entry point returns the stored report, and an active run blocks
+it before any stage starts. The scheduler still uses its existing cadence.
+
+The synchronous persistence regression failed before repair. The guarded
+offline suite passed 317 tests, skipped 43 PostgreSQL cases and deselected
+six download-calling cases in 6.91s. Coverage was 78.93%, with zero blocked
+connection attempts. Ruff and focused mypy with skipped imports passed.
+Tests use mocked stages and sessions. The live CLI, scheduler and
+PostgreSQL concurrency were outside this check.

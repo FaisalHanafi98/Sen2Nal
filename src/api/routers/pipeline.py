@@ -1,21 +1,19 @@
 """Pipeline monitoring and control endpoints."""
 
-import logging
 import math
 import re
 from datetime import datetime
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Header, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.config import settings
 from src.constants import API_PREFIX
 from src.database.connection import get_db
 from src.database.models import PipelineLog, PipelineRun
-
-logger = logging.getLogger(__name__)
+from src.pipeline.runs import PipelineRunBusy, admit_pipeline_run, execute_saved_run
 
 
 def verify_pipeline_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -43,9 +41,6 @@ RunIdFilter = Annotated[str | None, Query(pattern=r"^[A-Za-z0-9_-]{1,50}$")]
 
 _LOG_STAGES = frozenset(key for key, _, _ in _STAGE_VIEWS) | {"experiment", "system"}
 _LOG_LEVELS = frozenset({"info", "warning", "success", "error"})
-_ADMISSION_LOCK = select(func.pg_try_advisory_xact_lock(
-    func.hashtext(func.current_schema()), func.hashtext("sen2nal.pipeline.admission"),
-))
 
 
 def _reported_duration(value: object) -> float | None:
@@ -162,83 +157,22 @@ def get_pipeline_logs(
 @router.post("/run", dependencies=[Depends(verify_pipeline_key)])
 def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Trigger a full pipeline run in the background."""
-    import uuid
-
-    # The active-row check must see commits made before acquiring the lock.
-    db.connection(execution_options={"isolation_level": "READ COMMITTED"})
-    if db.execute(_ADMISSION_LOCK).scalar_one() is not True:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Another pipeline run is being admitted")
-    active = db.execute(
-        select(PipelineRun.id).where(PipelineRun.status == "running").limit(1)
-    ).scalar_one_or_none()
-    if active is not None:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="A pipeline run is already active")
-
-    run_id = f"pipeline_{uuid.uuid4().hex}"
-
-    pipeline_run = PipelineRun(
-        run_id=run_id,
-        target_date=datetime.utcnow().date(),
-        status="running",
-    )
-    db.add(pipeline_run)
-    db.commit()
+    try:
+        run_id = admit_pipeline_run(db, datetime.utcnow().date())
+    except PipelineRunBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
 
     background_tasks.add_task(_run_pipeline_background, run_id)
-
     return {"status": "started", "run_id": run_id, "message": "Pipeline run started in background"}
 
 
 async def _run_pipeline_background(run_id: str) -> None:
-    """Background task wrapper for pipeline execution."""
-    from src.pipeline.runner import run_full_pipeline
+    """Run the saved job in its own database session."""
     from src.database.connection import SessionLocal
+    from src.pipeline.runner import run_full_pipeline
 
     db = SessionLocal()
-    query = select(PipelineRun).where(PipelineRun.run_id == run_id)
     try:
-        record = cast(Any, db.execute(query).scalar_one_or_none())
-        if record is None or record.status != "running":
-            return
-
-        target = record.target_date
-        result = run_full_pipeline(db, target_date=target, run_id=run_id)
-        if (result.get("run_id") != run_id or result.get("target_date") != target.isoformat()
-                or result.get("overall_status") not in ("success", "failed")):
-            raise ValueError("Pipeline result did not match the saved run")
-
-        record.status = result["overall_status"]
-        record.finished_at = datetime.utcnow()
-        record.result_json = result
-        for stage_name, stage_data in result["stages"].items():
-            status = stage_data["status"]
-            elapsed = stage_data["elapsed_seconds"]
-            db.add(PipelineLog(
-                run_id=record.id,
-                stage=stage_name,
-                level="success" if status == "success" else "error",
-                message=f"{stage_name} {status} ({elapsed:.1f}s)",
-            ))
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.error("Pipeline worker failed for run %s", run_id)
-        record = cast(Any, db.execute(query).scalar_one_or_none())
-        if record is None or record.status != "running":
-            return
-        record.status = "failed"
-        record.finished_at = datetime.utcnow()
-        record.result_json = {
-            "run_id": run_id,
-            "target_date": record.target_date.isoformat(),
-            "overall_status": "failed",
-            "error_code": "pipeline_worker_failed",
-            "stages": {},
-        }
-        db.add(PipelineLog(run_id=record.id, stage="system", level="error",
-                           message="Pipeline worker failed"))
-        db.commit()
+        execute_saved_run(db, run_id, run_full_pipeline)
     finally:
         db.close()

@@ -20,13 +20,16 @@ _scheduler: BackgroundScheduler | None = None
 def _run_scheduled_pipeline():
     """Scheduled job: run the full pipeline for today."""
     from src.database.connection import SessionLocal
-    from src.pipeline.runner import run_full_pipeline
+    from src.pipeline.runner import run_pipeline_async
+    from src.pipeline.runs import PipelineRunBusy
 
     logger.info("Scheduled pipeline run starting...")
     db = SessionLocal()
     try:
-        result = run_full_pipeline(db, date.today())
+        result = run_pipeline_async(db, date.today())
         logger.info(f"Scheduled run complete: {result['overall_status']}")
+    except PipelineRunBusy:
+        logger.info("Scheduled run skipped because another run is active")
     except Exception as e:
         logger.error(f"Scheduled pipeline run failed: {e}")
     finally:

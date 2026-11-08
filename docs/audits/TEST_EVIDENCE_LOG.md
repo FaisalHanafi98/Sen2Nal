@@ -525,3 +525,12 @@ guarded offline suite passed 315 tests, skipped 43 PostgreSQL cases and
 deselected six download-calling cases in 7.88s. Coverage was 78.91%, with zero
 blocked connection attempts. Ruff and focused mypy with skipped imports passed.
 Provider behaviour and PostgreSQL rollback remain unverified.
+
+## SN02.16 — Readable stage failure outcomes (8 November 2026)
+
+Starting revision `79a5e49`. The dashboard uses the saved stage outcome to
+show incomplete inputs, invalid output and other errors as separate text
+labels. The synthetic render reproduced the missing distinction before repair.
+It then checked all three labels, the saved run status and sample mode. The
+Vite build and ESLint passed with the existing chunk-size and React hook
+warnings. A live browser session was outside this check.

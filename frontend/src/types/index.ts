@@ -55,6 +55,7 @@ export interface PipelineLog {
 export interface PipelineStatus {
   stage: string
   status: 'idle' | 'running' | 'complete' | 'error'
+  outcome?: 'unreported' | 'success' | 'failed' | 'invalid' | 'partial'
   lastRun: string
   duration: number
 }

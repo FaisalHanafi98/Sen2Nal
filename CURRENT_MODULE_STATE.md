@@ -66,6 +66,8 @@ mark ingestion partial and roll back pending writes. A valid empty NewsAPI
 response can still succeed. Fear & Greed transport availability is recorded
 separately because the critical signal stages do not consume that index.
 The offline suite passed 315 tests with 78.91% coverage.
+The dashboard shows incomplete inputs and invalid output as distinct stage
+outcomes. A synthetic render, the Vite build and lint passed.
 
 ## Completed SN01-A foundations (4 November 2026)
 

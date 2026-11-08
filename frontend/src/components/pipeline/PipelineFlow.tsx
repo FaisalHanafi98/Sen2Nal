@@ -28,6 +28,12 @@ const stageStatusLabels = {
   error: 'Error',
 }
 
+function stageLabel(state: PipelineStatus['status'], outcome: PipelineStatus['outcome']) {
+  if (state === 'error' && outcome === 'partial') return 'Incomplete inputs'
+  if (state === 'error' && outcome === 'invalid') return 'Invalid output'
+  return stageStatusLabels[state]
+}
+
 export default function PipelineFlow({ statuses }: Props) {
   return (
     <div className="bg-nightops-card border border-nightops-border rounded-lg p-4">
@@ -67,7 +73,7 @@ export default function PipelineFlow({ statuses }: Props) {
                     {stage}
                   </p>
                   <p className="text-[9px] font-mono mt-0.5" style={{ color }}>
-                    {stageStatusLabels[state]}
+                    {stageLabel(state, status?.outcome)}
                     {status && state !== 'idle' && stage !== 'Output & Storage'
                       ? ` · ${status.duration.toFixed(1)}s` : ''}
                   </p>

@@ -20,7 +20,7 @@ from typing import Any, cast
 import requests  # type: ignore[import-untyped]
 from sqlalchemy import select
 
-from src.agents.base import BaseAgent
+from src.agents.base import BaseAgent, IncompleteStageData
 from src.config import settings
 from src.constants import TOP_10_TICKERS
 from src.contracts.base import DataContractViolation
@@ -76,6 +76,7 @@ class IngestionAgent(BaseAgent):
         # 4. Fear & Greed index
         fg = self._ingest_fear_greed(target)
         results["fear_greed"] = fg
+        results["fear_greed_state"] = "available" if fg is not None else "unavailable"
 
         self.db.commit()
         return results
@@ -146,8 +147,8 @@ class IngestionAgent(BaseAgent):
         try:
             import yfinance as yf
         except ImportError:
-            self.logger.warning("yfinance not installed — skipping price ingestion")
-            return 0
+            self.logger.warning("The price adapter is unavailable")
+            raise IncompleteStageData from None
 
         count = 0
         start = target - timedelta(days=5)
@@ -157,10 +158,10 @@ class IngestionAgent(BaseAgent):
         for ticker in tickers:
             try:
                 stock = yf.Ticker(ticker)
-                hist = stock.history(start=str(start), end=str(end))
+                hist = stock.history(start=str(start), end=str(end), raise_errors=True)
             except Exception:
                 self.logger.warning("Price fetch failed for %s", ticker)
-                continue
+                raise IncompleteStageData from None
             if len(hist.index) == 0:
                 self.logger.debug("No price data for %s", ticker)
                 continue
@@ -256,7 +257,7 @@ class IngestionAgent(BaseAgent):
                 resp.raise_for_status()
             except Exception:
                 self.logger.warning("NewsAPI fetch failed for %s", ticker)
-                continue
+                raise IncompleteStageData from None
 
             try:
                 payload = resp.json()
@@ -316,8 +317,8 @@ class IngestionAgent(BaseAgent):
         try:
             import praw
         except ImportError:
-            self.logger.warning("praw not installed — skipping Reddit ingestion")
-            return 0
+            self.logger.warning("The configured Reddit adapter is unavailable")
+            raise IncompleteStageData from None
 
         reddit = praw.Reddit(
             client_id=client_id,
@@ -334,7 +335,7 @@ class IngestionAgent(BaseAgent):
                 posts = list(reddit.subreddit(sub_name).hot(limit=50))
             except Exception:
                 self.logger.warning("Reddit fetch failed for r/%s", sub_name)
-                continue
+                raise IncompleteStageData from None
 
             for post in posts:
                 title = _source_text(getattr(post, "title", None), "title")

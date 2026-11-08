@@ -61,6 +61,11 @@ for a saved active run before admitting another. The offline suite passed 312
 tests with 78.75% coverage. The two-session PostgreSQL case awaits an authorised
 test database. CLI and scheduler admission and recovery of abandoned active
 rows remain open.
+Reported failures from price, configured NewsAPI or configured Reddit now
+mark ingestion partial and roll back pending writes. A valid empty NewsAPI
+response can still succeed. Fear & Greed transport availability is recorded
+separately because the critical signal stages do not consume that index.
+The offline suite passed 315 tests with 78.91% coverage.
 
 ## Completed SN01-A foundations (4 November 2026)
 

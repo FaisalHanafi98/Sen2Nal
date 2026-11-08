@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 from src.agents import ingestion
+from src.agents.base import IncompleteStageData
 from src.agents.ingestion import IngestionAgent, _get_stock_metadata, _parse_datetime
 from src.constants import ALLOWED_TICKERS
 
@@ -99,8 +100,8 @@ class TestNewsIngestion:
         mock_settings.newsapi_api_key = "test-key"
         mock_get.side_effect = Exception("API timeout")
 
-        count = agent._ingest_news(["AAPL"], date(2026, 3, 20))
-        assert count == 0
+        with pytest.raises(IncompleteStageData):
+            agent._ingest_news(["AAPL"], date(2026, 3, 20))
 
 
 # -- Reddit ingestion -------------------------------------------------------
@@ -204,6 +205,31 @@ def test_later_invalid_news_record_rolls_back_pending_writes(text_ingestion, mon
     text_ingestion.db.rollback.assert_called_once()
 
 
+def test_news_transport_failure_marks_partial_and_rolls_back(text_ingestion, monkeypatch):
+    response = MagicMock()
+    response.json.return_value = {"articles": [{"title": "Synthetic news"}]}
+    fetch = MagicMock(side_effect=[response, RuntimeError("fixture provider failure")])
+    monkeypatch.setattr(ingestion.requests, "get", fetch)
+    result = text_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL", "MSFT"])
+    assert result["status"] == "partial"
+    assert result["error_code"] == "stage_input_incomplete"
+    assert "fixture provider failure" not in str(result)
+    text_ingestion.db.add.assert_called_once()
+    text_ingestion.db.commit.assert_not_called()
+    text_ingestion.db.rollback.assert_called_once()
+
+
+def test_valid_empty_news_batch_can_succeed(text_ingestion, monkeypatch):
+    response = MagicMock()
+    response.json.return_value = {"articles": []}
+    monkeypatch.setattr(ingestion.requests, "get", MagicMock(return_value=response))
+    result = text_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "success" and result["news_ingested"] == 0
+    assert result["fear_greed_state"] == "unavailable"
+    text_ingestion.db.add.assert_not_called()
+    text_ingestion.db.commit.assert_called_once()
+
+
 def test_invalid_reddit_record_cannot_be_committed(text_ingestion, monkeypatch):
     monkeypatch.setattr(ingestion.settings, "newsapi_api_key", None)
     monkeypatch.setattr(ingestion.settings, "reddit_client_id", "fixture-only")
@@ -265,6 +291,18 @@ def test_price_write_retains_observed_zero_return_and_volume(market_ingestion, m
     assert first.daily_return is None
     assert second.daily_return == 0.0 and second.volume == 0
     assert [type(second.daily_return), type(second.volume), type(second.close)] == [float, int, float]
+
+
+def test_reported_price_fetch_error_is_partial(market_ingestion, monkeypatch):
+    monkeypatch.setattr(market_ingestion, "_ingest_fear_greed", lambda *args: None)
+    history = MagicMock(side_effect=RuntimeError("fixture price failure"))
+    ticker = SimpleNamespace(history=history)
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(Ticker=lambda _: ticker))
+    result = market_ingestion.run(target_date=date(2026, 11, 4), tickers=["AAPL"])
+    assert result["status"] == "partial"
+    assert history.call_args.kwargs["raise_errors"] is True
+    market_ingestion.db.commit.assert_not_called()
+    market_ingestion.db.rollback.assert_called_once()
 
 
 @pytest.mark.parametrize("score_data", [

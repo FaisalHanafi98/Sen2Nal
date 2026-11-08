@@ -510,3 +510,18 @@ skipped 43 PostgreSQL cases and deselected six download-calling cases in 7.05s.
 Coverage was 78.75%, with zero blocked connection attempts in that completed
 run. Ruff and focused mypy with skipped imports passed. The new test with
 two PostgreSQL sessions was skipped because the authorised test URL was unset.
+
+## SN02.15 — Partial ingestion on fetch failure (8 November 2026)
+
+Starting revision `3d9a0b8`. A reported price, configured NewsAPI or configured
+Reddit fetch failure marks the stage partial and rolls back pending writes.
+A valid empty news response can still succeed. Missing optional text
+credentials preserve the existing skip. Fear & Greed remains supplemental
+context and its transport availability is reported separately. The locked
+yfinance adapter accepts the option to raise fetch errors.
+
+The two failure regressions reproduced ordinary success before repair. The
+guarded offline suite passed 315 tests, skipped 43 PostgreSQL cases and
+deselected six download-calling cases in 7.88s. Coverage was 78.91%, with zero
+blocked connection attempts. Ruff and focused mypy with skipped imports passed.
+Provider behaviour and PostgreSQL rollback remain unverified.

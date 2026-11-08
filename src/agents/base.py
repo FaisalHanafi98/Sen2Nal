@@ -14,6 +14,10 @@ from src.contracts.base import DataContractViolation
 _RUN_METADATA = frozenset({"status", "agent", "run_id", "elapsed_seconds", "error_code"})
 
 
+class IncompleteStageData(Exception):
+    """A stage could not collect all of its requested inputs."""
+
+
 class BaseAgent(ABC):
     """Base class for all pipeline agents.
 
@@ -95,6 +99,9 @@ class BaseAgent(ABC):
         except DataContractViolation:
             result = {"status": "invalid", "error_code": "data_contract_violation",
                       "error": "Stage output contains validation errors"}
+        except IncompleteStageData:
+            result = {"status": "partial", "error_code": "stage_input_incomplete",
+                      "error": "Stage could not collect all requested inputs"}
         except Exception:
             result = {"status": "failed", "error_code": "stage_exception",
                       "error": "Stage execution failed"}

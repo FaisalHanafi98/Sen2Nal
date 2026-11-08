@@ -192,6 +192,27 @@ class TestExecuteMethod:
         result = agent.execute(target_date=date(2026, 6, 15), tickers=["AAPL"])
         assert result["target_date"] == "2026-06-15"
 
+    def test_run_validates_calendar_signal_and_serialises_target_date(self, agent):
+        result = agent.run(target_date=date(2026, 3, 20), tickers=["AAPL"])
+        assert result["status"] == "success"
+        assert result["target_date"] == "2026-03-20"
+        assert result["tickers_computed"] == 1
+        assert result["signals"]["AAPL"]["trading_day_of_month"] > 0
+        agent.db.rollback.assert_not_called()
+
+    def test_run_rejects_malformed_calendar_signal(self, agent, monkeypatch):
+        compute_signal = agent._compute_signal
+
+        def bad_score(ticker, target):
+            return {**compute_signal(ticker, target), "calendar_score": 1.5}
+
+        monkeypatch.setattr(agent, "_compute_signal", bad_score)
+        result = agent.run(target_date=date(2026, 3, 20), tickers=["AAPL"])
+        assert result["status"] == "invalid"
+        assert result["error_code"] == "data_contract_violation"
+        assert "signals" not in result
+        agent.db.rollback.assert_called_once()
+
 
 # -- Malaysian holidays -------------------------------------------------------
 

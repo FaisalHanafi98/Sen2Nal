@@ -453,3 +453,16 @@ Coverage was 77.91%, with zero blocked connection attempts. Ruff and focused
 mypy with skipped imports passed. The tests use fixture provider responses and
 mocked sessions. Live provider shapes, as-of eligibility and PostgreSQL storage
 remain unverified.
+
+## SN02.11 — Calendar signal boundary (8 November 2026)
+
+Starting revision `666036d`. A valid weekday signal failed the strict contract
+because the stage validated its serialised date. It now validates the original
+date alongside each computed signal before returning the ISO date summary.
+Out-of-range signals still fail the stage and are withheld from downstream.
+
+The weekday regression failed before the fix. The offline suite passed 303
+tests, skipped 42 PostgreSQL cases and deselected six download-calling cases
+in 7.08s. Coverage was 78.21%, with zero blocked connection attempts. Ruff and
+focused mypy with skipped imports passed. The calendar features still use
+local estimates for holidays, trading days and earnings proximity.

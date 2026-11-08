@@ -12,8 +12,9 @@ import math
 from datetime import date, timedelta
 from typing import Any
 
-
 from src.agents.base import BaseAgent
+from src.contracts.calendar import CalendarOutput
+from src.data_quality.validator import require_record
 
 
 def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
@@ -160,19 +161,11 @@ class CalendarAgent(BaseAgent):
 
         results: dict[str, dict[str, Any]] = {}
         for ticker in ticker_list:
-            results[ticker] = self._compute_signal(ticker, target)
+            signal = self._compute_signal(ticker, target)
+            require_record("calendar", CalendarOutput, {"ticker": ticker, "date": target, **signal})
+            results[ticker] = signal
 
         return {"target_date": str(target), "signals": results, "tickers_computed": len(results)}
-
-    def _validation_records(self, result: dict[str, Any]) -> list[dict[str, Any]] | None:
-        signals = result.get("signals", {})
-        target_date = result.get("target_date")
-        if not signals or not target_date:
-            return None
-        records = []
-        for ticker, signal in signals.items():
-            records.append({"ticker": ticker, "date": target_date, **signal})
-        return records
 
     def _compute_signal(self, ticker: str, target: date) -> dict[str, Any]:
         """Compute calendar signal components for a single ticker/date."""

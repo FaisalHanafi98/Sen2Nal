@@ -46,8 +46,11 @@ with 74.02% coverage. NewsAPI and Reddit records now pass write contracts before
 staging, and malformed records trigger rollback. Price bars and Fear & Greed
 records now have write contracts too. Flat price returns and zero prior index
 scores are preserved. The offline suite passed 301 tests with 77.91% coverage.
-Live provider compatibility, source timestamps, availability reporting and
-concurrent admission remain open.
+The calendar stage now validates its computed records with the original date
+before serialising the summary. The offline suite passed 303 tests with 78.21%
+coverage. The legacy calendar still uses approximations. Live provider
+compatibility, source timestamps, availability reporting and concurrent
+admission remain open.
 
 ## Completed SN01-A foundations (4 November 2026)
 

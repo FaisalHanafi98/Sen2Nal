@@ -563,3 +563,18 @@ connection attempts. Ruff and focused mypy with skipped imports passed.
 Synthetic dashboard rendering, Vite and ESLint passed with the existing
 warnings. The two-session test now includes a duplicate claim. It remains
 skipped without an authorised test URL. Abandoned rows require reconciliation.
+
+## SN02.19 — Offload the API worker (8 November 2026)
+
+Starting revision `0aa08f3`. The FastAPI worker is synchronous, so its
+background dispatch goes through the thread pool. The worker still opens
+its own database session. The socket-free ASGI dispatch regression failed
+before repair and then verified that the worker passed through the offload
+path. The test executes the offload inline.
+
+The guarded offline suite passed 321 tests, skipped 43 PostgreSQL cases
+and deselected six download-calling cases in 10.45s. Coverage was 78.95%,
+with zero blocked connection attempts. Ruff and focused mypy with skipped
+imports passed. Real request responsiveness and native transactions remain
+unverified. A failed stage rolls back its pending writes. Earlier stage
+commits survive and are recorded in the failed run report.

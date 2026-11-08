@@ -166,7 +166,7 @@ def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(ge
     return {"status": "started", "run_id": run_id, "message": "Pipeline run started in background"}
 
 
-async def _run_pipeline_background(run_id: str) -> None:
+def _run_pipeline_background(run_id: str) -> None:
     """Run the saved job in its own database session."""
     from src.database.connection import SessionLocal
     from src.pipeline.runner import run_full_pipeline

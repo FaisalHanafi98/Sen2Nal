@@ -254,6 +254,22 @@ def test_worker_claims_the_run_before_any_stage_starts(pipeline_client, stages):
     assert {"queued", "running"}.issubset(claim.compile().params.values())
 
 
+def test_sync_worker_is_dispatched_through_the_threadpool(pipeline_client, monkeypatch):
+    send, admission, _, _ = pipeline_client
+    dispatched = []
+    run_inline = anyio.to_thread.run_sync
+
+    async def track_dispatch(function, *args, **kwargs):
+        dispatched.append(function)
+        return await run_inline(function, *args, **kwargs)
+
+    monkeypatch.setattr(anyio.to_thread, "run_sync", track_dispatch)
+    response = send("POST", "/api/v1/pipeline/run", headers={"X-Api-Key": "fixture-only"})
+    assert response.is_success
+    assert pipeline_routes._run_pipeline_background in dispatched
+    assert admission.add.call_args.args[0].status == "success"
+
+
 @pytest.mark.parametrize("headers", [{}, {"X-Api-Key": "wrong-fixture"}])
 def test_trigger_refuses_bad_key_before_writing_or_starting_a_run(pipeline_client, stages, headers):
     send, admission, _, worker_factory = pipeline_client

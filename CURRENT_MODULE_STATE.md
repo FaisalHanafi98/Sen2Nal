@@ -75,6 +75,10 @@ the change to running before starting stages. The dashboard shows both
 states. The offline suite passed 320 tests with 78.95% coverage. The
 two-session test covers a duplicate worker claim when run on an authorised
 PostgreSQL database. Legacy running rows remain active until reconciled.
+FastAPI dispatches synchronous pipeline work through its background thread
+pool. The offline suite passed 321 tests with 78.95% coverage. Committed
+stages retain their rows if a later stage fails. Only pending stage writes
+roll back, and the saved run records the failure.
 
 ## Completed SN01-A foundations (4 November 2026)
 

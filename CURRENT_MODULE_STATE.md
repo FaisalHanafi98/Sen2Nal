@@ -93,6 +93,16 @@ The local VADER analyser was measured with synthetic text. The exact FinBERT
 revision, tokenizer, weights and rights are still open, and the runtime
 loader has not been changed. See the test evidence log for scope and results.
 
+## Research replay contract (8 November 2026)
+
+A frozen replay candidate binds supplied tags and named scores to the
+original manifest, its selected evidence versions and dated company and
+ticker mappings. It requires exact scorer references and prior history
+available at the cutoff. Its hash changes with the tag or scorer while the
+original manifest hash remains stable. The offline suite passed 336 tests
+with 79.99% coverage. Persistence, visibility, private notes and publication
+remain open.
+
 ## Completed SN01-A foundations (4 November 2026)
 
 The owner authorised continued implementation after SN-BASE. Starting revision:

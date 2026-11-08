@@ -325,3 +325,92 @@ def test_manifest_rejects_a_tampered_cutoff_and_preserves_frozen_original():
         universe(members=universe().members[:49])
     with pytest.raises(ValidationError):
         CompanyTicker(company_id="synthetic", ticker="SYN", country="MY", rank=1)
+
+
+def _replay_fixture(**changes):
+    from src.contracts.replay import ResearchReplay, SignalSnapshot
+
+    source = manifest(calendar=session(), universe=universe())
+    signal = {
+        "member": source.universe.members[0],
+        "research_tag": "Synthetic tag",
+        "scores": ({"name": "sentiment", "value": 0.4, "meaning": "Synthetic scorer output"},),
+        "scorer": {
+            "scorer": "finbert",
+            "model_id": "fixture",
+            "revision": "fixture-v1",
+            "runtime_version": "fixture-runtime",
+            "artifact_hash": "a" * 64,
+            "tokenizer_hash": "b" * 64,
+        },
+        "history": {
+            "first_date": date(2025, 11, 4),
+            "last_date": date(2026, 11, 3),
+            "available_at": datetime(2026, 11, 4, 12, tzinfo=timezone.utc),
+            "content_hash": "c" * 64,
+        },
+        "evidence": source.evidence,
+    }
+    return ResearchReplay(manifest=source, signals=(SignalSnapshot(**(signal | changes)),))
+
+
+def test_replay_round_trips_and_changes_hash_when_the_model_changes():
+    from src.contracts.replay import ResearchReplay
+
+    original = _replay_fixture()
+    restored = ResearchReplay.model_validate_json(original.canonical_json())
+    assert restored == original
+    assert restored.replay_hash == original.replay_hash
+    model = original.signals[0].scorer.model_dump() | {"revision": "fixture-v2"}
+    revised = _replay_fixture(scorer=model)
+    assert revised.manifest.manifest_hash == original.manifest.manifest_hash
+    assert revised.replay_hash != original.replay_hash
+
+
+def test_replay_rejects_evidence_or_tickers_outside_its_manifest():
+    with pytest.raises(ValidationError, match="evidence"):
+        _replay_fixture(evidence=(evidence("another-version", content_hash="d" * 64),))
+    wrong_member = CompanyTicker(company_id="another-company", ticker="OTHER",
+                                 country="US", rank=1)
+    with pytest.raises(ValidationError, match="membership"):
+        _replay_fixture(member=wrong_member)
+
+
+@pytest.mark.parametrize("change", [
+    {"last_date": date(2026, 11, 4)},
+    {"available_at": datetime(2026, 11, 4, 13, 1, tzinfo=timezone.utc)},
+    {"first_date": date(2026, 11, 4)},
+])
+def test_replay_rejects_history_outside_its_cutoff(change):
+    history = _replay_fixture().signals[0].history.model_dump() | change
+    with pytest.raises(ValidationError, match="[Hh]istory"):
+        _replay_fixture(history=history)
+
+
+def test_replay_requires_finbert_tokenizer_identity():
+    scorer = _replay_fixture().signals[0].scorer.model_dump() | {"tokenizer_hash": None}
+    with pytest.raises(ValidationError, match="tokenizer"):
+        _replay_fixture(scorer=scorer)
+
+
+def test_replay_withholds_signals_when_inputs_are_unavailable():
+    from src.contracts.replay import ResearchReplay
+
+    source = manifest()
+    assert ResearchReplay(manifest=source, signals=()).signals == ()
+    with pytest.raises(ValidationError, match="eligible inputs"):
+        ResearchReplay(manifest=source, signals=_replay_fixture().signals)
+
+
+def test_replay_has_one_signal_per_company_and_a_stable_score_order():
+    from src.contracts.replay import ResearchReplay
+
+    first = {"name": "sentiment", "value": 0.4, "meaning": "Synthetic scorer output"}
+    second = {"name": "calendar", "value": 0.2, "meaning": "Synthetic calendar input"}
+    original = _replay_fixture(scores=(first, second))
+    reordered = _replay_fixture(scores=(second, first))
+    assert reordered.replay_hash == original.replay_hash
+    with pytest.raises(ValidationError, match="component names"):
+        _replay_fixture(scores=(first, first))
+    with pytest.raises(ValidationError, match="distinct manifest membership"):
+        ResearchReplay(manifest=original.manifest, signals=original.signals * 2)

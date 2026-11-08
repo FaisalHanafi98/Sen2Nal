@@ -606,3 +606,18 @@ shell. Exact revision, tokenizer and weight files, rights and FinBERT runtime
 measurements still require an authorised local snapshot. The production
 loader still has download-capable paths. No assets were copied or downloaded
 for this check.
+
+## SN-M01.1 — Frozen replay output contract (8 November 2026)
+
+Starting revision `79bd774`. The replay contract binds supplied research
+tags, named scores, scorer artifact references and prior history to the
+frozen input manifest. It rejects a signal for a foreign or repeated member,
+unselected evidence, history unavailable at the cutoff and FinBERT without
+a tokenizer hash. Canonical serialization keeps the hash stable under
+input order changes and changes it when the scorer revision changes.
+
+Five focused negative cases failed before the binding checks. The guarded
+offline suite passed 336 tests and skipped 43 PostgreSQL cases in 18.76s.
+Coverage was 79.99%, with zero blocked connection attempts. Ruff and focused
+mypy with skipped imports passed. The replay tests use synthetic references.
+They establish no persistence, provider truth, rights or actual publication.
